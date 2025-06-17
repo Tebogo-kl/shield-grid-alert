@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, Lock, User, Phone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserSignupFormProps {
   onBack: () => void;
@@ -18,22 +19,40 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
     phone: '',
     address: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
+  const [loading, setLoading] = useState(false);
+  const { signUp } = useAuth();
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
     }
-    // TODO: Implement actual signup logic
-    console.log('User signup:', formData);
-    alert('Signup functionality will be implemented with Supabase integration');
+
+    setLoading(true);
+
+    const { error } = await signUp(
+      formData.email,
+      formData.password,
+      {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone: formData.phone,
+        address: formData.address,
+      }
+    );
+
+    setLoading(false);
   };
 
   return (
@@ -49,7 +68,7 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
         </Button>
         <div className="flex items-center">
           <User className="h-6 w-6 text-green-400 mr-2" />
-          <h2 className="text-xl font-semibold text-white">User Registration</h2>
+          <h2 className="text-xl font-semibold text-white">User Sign Up</h2>
         </div>
       </div>
 
@@ -59,24 +78,28 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
             <Label htmlFor="firstName" className="text-white/90">First Name</Label>
             <Input
               id="firstName"
+              name="firstName"
               type="text"
               value={formData.firstName}
-              onChange={(e) => handleInputChange('firstName', e.target.value)}
+              onChange={handleInputChange}
               className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="John"
               required
+              disabled={loading}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="lastName" className="text-white/90">Last Name</Label>
             <Input
               id="lastName"
+              name="lastName"
               type="text"
               value={formData.lastName}
-              onChange={(e) => handleInputChange('lastName', e.target.value)}
+              onChange={handleInputChange}
               className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="Doe"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -87,28 +110,31 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
             <Mail className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="email"
+              name="email"
               type="email"
               value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="john@example.com"
               required
+              disabled={loading}
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone" className="text-white/90">Phone Number</Label>
+          <Label htmlFor="phone" className="text-white/90">Phone</Label>
           <div className="relative">
             <Phone className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="phone"
+              name="phone"
               type="tel"
               value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="+27 123 456 789"
-              required
+              placeholder="+1 (555) 123-4567"
+              disabled={loading}
             />
           </div>
         </div>
@@ -119,12 +145,13 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
             <MapPin className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="address"
+              name="address"
               type="text"
               value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="123 Main St, City"
-              required
+              placeholder="123 Main St, City, State"
+              disabled={loading}
             />
           </div>
         </div>
@@ -135,12 +162,14 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
             <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="password"
+              name="password"
               type="password"
               value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="Create a password"
+              placeholder="Enter your password"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -151,18 +180,24 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
             <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="confirmPassword"
+              name="confirmPassword"
               type="password"
               value={formData.confirmPassword}
-              onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="Confirm your password"
               required
+              disabled={loading}
             />
           </div>
         </div>
 
-        <Button type="submit" className="w-full bg-green-600 hover:bg-green-700">
-          Create Account
+        <Button 
+          type="submit" 
+          className="w-full bg-green-600 hover:bg-green-700"
+          disabled={loading}
+        >
+          {loading ? 'Creating Account...' : 'Create Account'}
         </Button>
       </form>
 
@@ -172,8 +207,9 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
           <button 
             onClick={onLogin}
             className="text-green-400 hover:text-green-300 underline"
+            disabled={loading}
           >
-            Login
+            Sign in
           </button>
         </p>
       </div>

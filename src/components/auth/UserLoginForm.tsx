@@ -4,6 +4,8 @@ import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface UserLoginFormProps {
   onBack: () => void;
@@ -13,12 +15,21 @@ interface UserLoginFormProps {
 const UserLoginForm: React.FC<UserLoginFormProps> = ({ onBack, onSignup }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual login logic
-    console.log('User login:', { email, password });
-    alert('Login functionality will be implemented with Supabase integration');
+    setLoading(true);
+
+    const { error } = await signIn(email, password);
+    
+    if (!error) {
+      navigate('/');
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -51,6 +62,7 @@ const UserLoginForm: React.FC<UserLoginFormProps> = ({ onBack, onSignup }) => {
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="Enter your email"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -67,12 +79,17 @@ const UserLoginForm: React.FC<UserLoginFormProps> = ({ onBack, onSignup }) => {
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="Enter your password"
               required
+              disabled={loading}
             />
           </div>
         </div>
 
-        <Button type="submit" className="w-full bg-green-600 hover:bg-green-700">
-          Login
+        <Button 
+          type="submit" 
+          className="w-full bg-green-600 hover:bg-green-700"
+          disabled={loading}
+        >
+          {loading ? 'Signing in...' : 'Login'}
         </Button>
       </form>
 
@@ -82,6 +99,7 @@ const UserLoginForm: React.FC<UserLoginFormProps> = ({ onBack, onSignup }) => {
           <button 
             onClick={onSignup}
             className="text-green-400 hover:text-green-300 underline"
+            disabled={loading}
           >
             Sign up
           </button>

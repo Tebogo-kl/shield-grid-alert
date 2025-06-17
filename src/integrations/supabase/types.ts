@@ -9,7 +9,286 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      companies: {
+        Row: {
+          address: string
+          company_name: string
+          contact_person: string
+          contact_title: string
+          created_at: string | null
+          description: string | null
+          email: string
+          id: string
+          owner_id: string
+          phone: string
+          registration_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          address: string
+          company_name: string
+          contact_person: string
+          contact_title: string
+          created_at?: string | null
+          description?: string | null
+          email: string
+          id?: string
+          owner_id: string
+          phone: string
+          registration_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string
+          company_name?: string
+          contact_person?: string
+          contact_title?: string
+          created_at?: string | null
+          description?: string | null
+          email?: string
+          id?: string
+          owner_id?: string
+          phone?: string
+          registration_number?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          first_name: string
+          id: string
+          last_name: string
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          first_name: string
+          id: string
+          last_name: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      request_responses: {
+        Row: {
+          created_at: string | null
+          estimated_arrival: number | null
+          id: string
+          message: string | null
+          officer_id: string
+          request_id: string
+          response_time: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estimated_arrival?: number | null
+          id?: string
+          message?: string | null
+          officer_id: string
+          request_id: string
+          response_time?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estimated_arrival?: number | null
+          id?: string
+          message?: string | null
+          officer_id?: string
+          request_id?: string
+          response_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_responses_officer_id_fkey"
+            columns: ["officer_id"]
+            isOneToOne: false
+            referencedRelation: "security_officers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_responses_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          officer_id: string
+          rating: number
+          request_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          officer_id: string
+          rating: number
+          request_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          officer_id?: string
+          rating?: number
+          request_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_officer_id_fkey"
+            columns: ["officer_id"]
+            isOneToOne: false
+            referencedRelation: "security_officers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_officers: {
+        Row: {
+          badge_number: string
+          company_id: string
+          created_at: string | null
+          current_latitude: number | null
+          current_longitude: number | null
+          hourly_rate: number | null
+          id: string
+          rating: number | null
+          specializations: string[] | null
+          status: Database["public"]["Enums"]["officer_status"] | null
+          total_jobs: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          badge_number: string
+          company_id: string
+          created_at?: string | null
+          current_latitude?: number | null
+          current_longitude?: number | null
+          hourly_rate?: number | null
+          id?: string
+          rating?: number | null
+          specializations?: string[] | null
+          status?: Database["public"]["Enums"]["officer_status"] | null
+          total_jobs?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          badge_number?: string
+          company_id?: string
+          created_at?: string | null
+          current_latitude?: number | null
+          current_longitude?: number | null
+          hourly_rate?: number | null
+          id?: string
+          rating?: number | null
+          specializations?: string[] | null
+          status?: Database["public"]["Enums"]["officer_status"] | null
+          total_jobs?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_officers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_requests: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          estimated_duration: number | null
+          id: string
+          location_address: string | null
+          location_latitude: number
+          location_longitude: number
+          officer_id: string | null
+          service_type: Database["public"]["Enums"]["service_type"]
+          status: Database["public"]["Enums"]["request_status"] | null
+          total_cost: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          estimated_duration?: number | null
+          id?: string
+          location_address?: string | null
+          location_latitude: number
+          location_longitude: number
+          officer_id?: string | null
+          service_type: Database["public"]["Enums"]["service_type"]
+          status?: Database["public"]["Enums"]["request_status"] | null
+          total_cost?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          estimated_duration?: number | null
+          id?: string
+          location_address?: string | null
+          location_latitude?: number
+          location_longitude?: number
+          officer_id?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"]
+          status?: Database["public"]["Enums"]["request_status"] | null
+          total_cost?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_requests_officer_id_fkey"
+            columns: ["officer_id"]
+            isOneToOne: false
+            referencedRelation: "security_officers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +297,20 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      officer_status: "available" | "busy" | "offline"
+      request_status:
+        | "pending"
+        | "accepted"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+      service_type:
+        | "armed_response"
+        | "patrol"
+        | "escort"
+        | "emergency"
+        | "surveillance"
+      user_role: "user" | "company_admin" | "security_officer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +425,23 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      officer_status: ["available", "busy", "offline"],
+      request_status: [
+        "pending",
+        "accepted",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
+      service_type: [
+        "armed_response",
+        "patrol",
+        "escort",
+        "emergency",
+        "surveillance",
+      ],
+      user_role: ["user", "company_admin", "security_officer"],
+    },
   },
 } as const

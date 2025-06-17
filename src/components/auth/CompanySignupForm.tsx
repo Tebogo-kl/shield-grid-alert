@@ -1,10 +1,13 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Mail, Lock, Building, Phone, MapPin, FileText, Users } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, Building, Phone, MapPin, User, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface CompanySignupFormProps {
   onBack: () => void;
@@ -22,22 +25,89 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
     contactPerson: '',
     contactTitle: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
+  const [loading, setLoading] = useState(false);
+  const { signUp } = useAuth();
+  const { toast } = useToast();
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
       return;
     }
-    // TODO: Implement actual signup logic
-    console.log('Company signup:', formData);
-    alert('Company registration functionality will be implemented with Supabase integration');
+
+    setLoading(true);
+
+    try {
+      // First, create the user account
+      const { error: signUpError } = await signUp(
+        formData.email,
+        formData.password,
+        {
+          first_name: formData.contactPerson.split(' ')[0] || '',
+          last_name: formData.contactPerson.split(' ').slice(1).join(' ') || '',
+          phone: formData.phone,
+          address: formData.address,
+        }
+      );
+
+      if (signUpError) {
+        setLoading(false);
+        return;
+      }
+
+      // Then, create the company record
+      const { error: companyError } = await supabase
+        .from('companies')
+        .insert({
+          company_name: formData.companyName,
+          registration_number: formData.registrationNumber,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          description: formData.description,
+          contact_person: formData.contactPerson,
+          contact_title: formData.contactTitle,
+          owner_id: (await supabase.auth.getUser()).data.user?.id,
+        });
+
+      if (companyError) {
+        console.error('Company creation error:', companyError);
+        toast({
+          title: "Company Registration Error",
+          description: "Failed to register company. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success!",
+          description: "Company registration successful. Please check your email to verify your account.",
+        });
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        title: "Registration Error",
+        description: "An error occurred during registration.",
+        variant: "destructive",
+      });
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -64,12 +134,14 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <Building className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="companyName"
+              name="companyName"
               type="text"
               value={formData.companyName}
-              onChange={(e) => handleInputChange('companyName', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="Security Solutions Inc."
+              placeholder="SecureGuard Solutions"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -80,42 +152,14 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <FileText className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="registrationNumber"
+              name="registrationNumber"
               type="text"
               value={formData.registrationNumber}
-              onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="REG123456789"
               required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="contactPerson" className="text-white/90">Contact Person</Label>
-            <div className="relative">
-              <Users className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-              <Input
-                id="contactPerson"
-                type="text"
-                value={formData.contactPerson}
-                onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                placeholder="John Smith"
-                required
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contactTitle" className="text-white/90">Title</Label>
-            <Input
-              id="contactTitle"
-              type="text"
-              value={formData.contactTitle}
-              onChange={(e) => handleInputChange('contactTitle', e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="Manager"
-              required
+              disabled={loading}
             />
           </div>
         </div>
@@ -126,12 +170,14 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <Mail className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="email"
+              name="email"
               type="email"
               value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="info@company.com"
+              placeholder="admin@secureguard.com"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -142,12 +188,14 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <Phone className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="phone"
+              name="phone"
               type="tel"
               value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="+27 11 123 4567"
+              placeholder="+1 (555) 123-4567"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -158,26 +206,63 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <MapPin className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="address"
+              name="address"
               type="text"
               value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="123 Business St, Johannesburg"
+              placeholder="123 Business Ave, City, State"
               required
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="contactPerson" className="text-white/90">Contact Person</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 h-4 w-4 text-white/50" />
+              <Input
+                id="contactPerson"
+                name="contactPerson"
+                type="text"
+                value={formData.contactPerson}
+                onChange={handleInputChange}
+                className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                placeholder="John Smith"
+                required
+                disabled={loading}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contactTitle" className="text-white/90">Contact Title</Label>
+            <Input
+              id="contactTitle"
+              name="contactTitle"
+              type="text"
+              value={formData.contactTitle}
+              onChange={handleInputChange}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+              placeholder="CEO"
+              required
+              disabled={loading}
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description" className="text-white/90">Company Description</Label>
+          <Label htmlFor="description" className="text-white/90">Company Description (Optional)</Label>
           <Textarea
             id="description"
+            name="description"
             value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
+            onChange={handleInputChange}
             className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
             placeholder="Brief description of your security services..."
             rows={3}
-            required
+            disabled={loading}
           />
         </div>
 
@@ -187,12 +272,14 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="password"
+              name="password"
               type="password"
               value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              placeholder="Create a password"
+              placeholder="Enter your password"
               required
+              disabled={loading}
             />
           </div>
         </div>
@@ -203,18 +290,24 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
             <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
             <Input
               id="confirmPassword"
+              name="confirmPassword"
               type="password"
               value={formData.confirmPassword}
-              onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+              onChange={handleInputChange}
               className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
               placeholder="Confirm your password"
               required
+              disabled={loading}
             />
           </div>
         </div>
 
-        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-          Register Company
+        <Button 
+          type="submit" 
+          className="w-full bg-blue-600 hover:bg-blue-700"
+          disabled={loading}
+        >
+          {loading ? 'Registering Company...' : 'Register Company'}
         </Button>
       </form>
 
@@ -224,8 +317,9 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
           <button 
             onClick={onLogin}
             className="text-blue-400 hover:text-blue-300 underline"
+            disabled={loading}
           >
-            Login
+            Sign in
           </button>
         </p>
       </div>
