@@ -7,8 +7,9 @@ import UserLoginForm from '@/components/auth/UserLoginForm';
 import UserSignupForm from '@/components/auth/UserSignupForm';
 import CompanyLoginForm from '@/components/auth/CompanyLoginForm';
 import CompanySignupForm from '@/components/auth/CompanySignupForm';
+import OfficerLoginForm from '@/components/auth/OfficerLoginForm';
 
-type AuthMode = 'select' | 'user-login' | 'user-signup' | 'company-login' | 'company-signup';
+type AuthMode = 'select' | 'user-login' | 'user-signup' | 'company-login' | 'company-signup' | 'officer-login';
 
 const Auth = () => {
   const [mode, setMode] = useState<AuthMode>('select');
@@ -23,6 +24,8 @@ const Auth = () => {
         return <CompanyLoginForm onBack={() => setMode('select')} onSignup={() => setMode('company-signup')} />;
       case 'company-signup':
         return <CompanySignupForm onBack={() => setMode('select')} onLogin={() => setMode('company-login')} />;
+      case 'officer-login':
+        return <OfficerLoginForm onBack={() => setMode('select')} />;
       default:
         return (
           <div className="space-y-6">
@@ -59,6 +62,20 @@ const Auth = () => {
                   <p className="text-white/70 text-sm">Manage officers and provide security services</p>
                   <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">
                     Continue as Company
+                  </Button>
+                </div>
+              </Card>
+
+              <Card 
+                className="cursor-pointer transition-all duration-200 hover:scale-105 bg-white/10 border-white/20 hover:bg-white/20"
+                onClick={() => setMode('officer-login')}
+              >
+                <div className="p-6 text-center">
+                  <Shield className="h-12 w-12 text-orange-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Security Officer</h3>
+                  <p className="text-white/70 text-sm">Access your officer dashboard</p>
+                  <Button className="w-full mt-4 bg-orange-600 hover:bg-orange-700">
+                    Officer Login
                   </Button>
                 </div>
               </Card>

@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, metadata?: any) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  officerSignIn: (name: string, badgeNumber: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -113,9 +114,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const officerSignIn = async (name: string, badgeNumber: string) => {
+    try {
+      // Find the security officer by name and badge number
+      const { data: officer, error: officerError } = await supabase
+        .from('security_officers')
+        .select(`
+          *,
+          profiles!inner(first_name, last_name, id)
+        `)
+        .eq('badge_number', badgeNumber)
+        .ilike('profiles.first_name', name.split(' ')[0])
+        .single();
+
+      if (officerError || !officer) {
+        const error = new Error('Invalid name or badge number');
+        toast({
+          title: "Login Error",
+          description: "Invalid name or badge number",
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      // Create a temporary session for the officer
+      const officerUser = {
+        id: officer.profiles.id,
+        email: `officer_${officer.badge_number}@temp.com`,
+        user_metadata: {
+          first_name: officer.profiles.first_name,
+          last_name: officer.profiles.last_name,
+          badge_number: officer.badge_number,
+          role: 'security_officer'
+        }
+      };
+
+      // Set session manually for officer
+      setUser(officerUser as any);
+      setSession({
+        user: officerUser as any,
+        access_token: 'temp_officer_token',
+        refresh_token: 'temp_refresh_token',
+        expires_in: 3600,
+        expires_at: Date.now() + 3600000,
+        token_type: 'bearer'
+      } as any);
+
+      toast({
+        title: "Welcome!",
+        description: `Logged in as ${officer.profiles.first_name} ${officer.profiles.last_name}`,
+      });
+
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: "Login Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
       toast({
         title: "Signed out",
         description: "You have been successfully signed out.",
@@ -135,6 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signUp,
     signIn,
+    officerSignIn,
     signOut,
   };
 
