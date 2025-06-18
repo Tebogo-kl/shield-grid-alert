@@ -17,7 +17,7 @@ interface ServiceRequest {
   location_longitude: number;
   status: string;
   created_at: string;
-  profiles: {
+  user_profile?: {
     first_name: string;
     last_name: string;
     phone: string;
@@ -37,25 +37,43 @@ const OfficerDashboard = () => {
 
   const fetchRequests = async () => {
     try {
-      const { data, error } = await supabase
+      // First get the service requests
+      const { data: serviceRequests, error: requestsError } = await supabase
         .from('service_requests')
-        .select(`
-          *,
-          profiles!service_requests_user_id_fkey(first_name, last_name, phone)
-        `)
+        .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      // Filter out any requests with null profiles and ensure type safety
-      const validRequests = (data || []).filter(request => 
-        request.profiles && 
-        typeof request.profiles === 'object' && 
-        'first_name' in request.profiles
-      ) as ServiceRequest[];
-      
-      setRequests(validRequests);
+      if (requestsError) throw requestsError;
+
+      if (!serviceRequests || serviceRequests.length === 0) {
+        setRequests([]);
+        return;
+      }
+
+      // Get user profiles for each request
+      const userIds = serviceRequests.map(req => req.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, phone')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const requestsWithProfiles = serviceRequests.map(request => {
+        const profile = profiles?.find(p => p.id === request.user_id);
+        return {
+          ...request,
+          user_profile: profile ? {
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            phone: profile.phone || 'N/A'
+          } : undefined
+        };
+      }).filter(request => request.user_profile) as ServiceRequest[];
+
+      setRequests(requestsWithProfiles);
     } catch (error) {
       console.error('Error fetching requests:', error);
     } finally {
@@ -242,12 +260,14 @@ const OfficerDashboard = () => {
                           </span>
                         </div>
                         <div className="space-y-2">
-                          <div className="flex items-center space-x-2 text-white">
-                            <User className="h-4 w-4" />
-                            <span>{request.profiles.first_name} {request.profiles.last_name}</span>
-                            <Phone className="h-4 w-4 ml-4" />
-                            <span>{request.profiles.phone}</span>
-                          </div>
+                          {request.user_profile && (
+                            <div className="flex items-center space-x-2 text-white">
+                              <User className="h-4 w-4" />
+                              <span>{request.user_profile.first_name} {request.user_profile.last_name}</span>
+                              <Phone className="h-4 w-4 ml-4" />
+                              <span>{request.user_profile.phone}</span>
+                            </div>
+                          )}
                           <div className="flex items-center space-x-2 text-white/70">
                             <MapPin className="h-4 w-4" />
                             <span>{request.location_address}</span>

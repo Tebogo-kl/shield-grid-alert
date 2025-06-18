@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // First, find the security officer by badge number
       const { data: officer, error: officerError } = await supabase
         .from('security_officers')
-        .select('*, profiles!security_officers_user_id_fkey(*)')
+        .select('*')
         .eq('badge_number', badgeNumber)
         .single();
 
@@ -133,11 +133,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error };
       }
 
+      // Get the officer's profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', officer.user_id)
+        .single();
+
+      if (profileError || !profile) {
+        const error = new Error('Officer profile not found');
+        toast({
+          title: "Login Error",
+          description: "Officer profile not found",
+          variant: "destructive",
+        });
+        return { error };
+      }
+
       // Check if the name matches (case insensitive)
-      const officerName = `${officer.profiles.first_name} ${officer.profiles.last_name}`.toLowerCase();
+      const officerName = `${profile.first_name} ${profile.last_name}`.toLowerCase();
       const providedName = name.toLowerCase().trim();
       
-      if (!officerName.includes(providedName) && !providedName.includes(officer.profiles.first_name.toLowerCase())) {
+      if (!officerName.includes(providedName) && !providedName.includes(profile.first_name.toLowerCase())) {
         const error = new Error('Invalid name or badge number');
         toast({
           title: "Login Error",
@@ -152,8 +169,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: officer.user_id,
         email: `officer_${officer.badge_number}@temp.com`,
         user_metadata: {
-          first_name: officer.profiles.first_name,
-          last_name: officer.profiles.last_name,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
           badge_number: officer.badge_number,
           role: 'security_officer'
         }
@@ -172,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       toast({
         title: "Welcome!",
-        description: `Logged in as ${officer.profiles.first_name} ${officer.profiles.last_name}`,
+        description: `Logged in as ${profile.first_name} ${profile.last_name}`,
       });
 
       return { error: null };
