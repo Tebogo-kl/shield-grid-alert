@@ -41,13 +41,21 @@ const OfficerDashboard = () => {
         .from('service_requests')
         .select(`
           *,
-          profiles!inner(first_name, last_name, phone)
+          profiles!service_requests_user_id_fkey(first_name, last_name, phone)
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRequests(data || []);
+      
+      // Filter out any requests with null profiles and ensure type safety
+      const validRequests = (data || []).filter(request => 
+        request.profiles && 
+        typeof request.profiles === 'object' && 
+        'first_name' in request.profiles
+      ) as ServiceRequest[];
+      
+      setRequests(validRequests);
     } catch (error) {
       console.error('Error fetching requests:', error);
     } finally {

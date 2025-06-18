@@ -116,18 +116,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const officerSignIn = async (name: string, badgeNumber: string) => {
     try {
-      // Find the security officer by name and badge number
+      // First, find the security officer by badge number
       const { data: officer, error: officerError } = await supabase
         .from('security_officers')
-        .select(`
-          *,
-          profiles!inner(first_name, last_name, id)
-        `)
+        .select('*, profiles!security_officers_user_id_fkey(*)')
         .eq('badge_number', badgeNumber)
-        .ilike('profiles.first_name', name.split(' ')[0])
         .single();
 
       if (officerError || !officer) {
+        const error = new Error('Invalid badge number');
+        toast({
+          title: "Login Error",
+          description: "Invalid badge number",
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      // Check if the name matches (case insensitive)
+      const officerName = `${officer.profiles.first_name} ${officer.profiles.last_name}`.toLowerCase();
+      const providedName = name.toLowerCase().trim();
+      
+      if (!officerName.includes(providedName) && !providedName.includes(officer.profiles.first_name.toLowerCase())) {
         const error = new Error('Invalid name or badge number');
         toast({
           title: "Login Error",
@@ -139,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Create a temporary session for the officer
       const officerUser = {
-        id: officer.profiles.id,
+        id: officer.user_id,
         email: `officer_${officer.badge_number}@temp.com`,
         user_metadata: {
           first_name: officer.profiles.first_name,
