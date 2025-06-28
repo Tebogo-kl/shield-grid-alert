@@ -33,11 +33,32 @@ const OfficerDashboard = () => {
   useEffect(() => {
     fetchRequests();
     fetchOfficerStatus();
+
+    // Set up real-time subscription for new requests
+    const channel = supabase
+      .channel('service-requests-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'service_requests'
+        },
+        () => {
+          console.log('New service request received');
+          fetchRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchRequests = async () => {
     try {
-      // First get the service requests
+      // Get pending service requests
       const { data: serviceRequests, error: requestsError } = await supabase
         .from('service_requests')
         .select('*')
@@ -105,6 +126,19 @@ const OfficerDashboard = () => {
 
       if (error) throw error;
       setOfficerStatus(newStatus);
+
+      // Update location when going available (optional enhancement)
+      if (newStatus === 'available' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          await supabase
+            .from('security_officers')
+            .update({ 
+              current_latitude: position.coords.latitude,
+              current_longitude: position.coords.longitude
+            })
+            .eq('user_id', user?.id);
+        });
+      }
     } catch (error) {
       console.error('Error updating status:', error);
     }

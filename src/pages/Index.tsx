@@ -4,67 +4,39 @@ import { MapPin, Shield, Clock, Star, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import SecurityMap from '@/components/SecurityMap';
 import ServiceSelector from '@/components/ServiceSelector';
 import OfficerCard from '@/components/OfficerCard';
 import EmergencyButton from '@/components/EmergencyButton';
 
-// Mock data for nearby security officers
-const nearbyOfficers = [
-  {
-    id: 1,
-    name: "Marcus Johnson",
-    company: "SecureGuard Solutions",
-    rating: 4.9,
-    distance: "0.3 km",
-    estimatedArrival: "3-5 mins",
-    specialization: "Armed Response",
-    status: "available",
-    location: { lat: -26.2041, lng: 28.0473 },
-    profileImage: "/api/placeholder/100/100",
-    yearsExperience: 8,
-    completedJobs: 1247,
-    responseTime: "2.4 mins avg"
-  },
-  {
-    id: 2,
-    name: "Sarah Williams",
-    company: "Elite Protection Services",
-    rating: 4.8,
-    distance: "0.7 km",
-    estimatedArrival: "5-8 mins",
-    specialization: "Personal Security",
-    status: "available",
-    location: { lat: -26.2051, lng: 28.0483 },
-    profileImage: "/api/placeholder/100/100",
-    yearsExperience: 6,
-    completedJobs: 892,
-    responseTime: "3.1 mins avg"
-  },
-  {
-    id: 3,
-    name: "David Chen",
-    company: "Rapid Response Security",
-    rating: 4.7,
-    distance: "1.2 km",
-    estimatedArrival: "6-10 mins",
-    specialization: "Emergency Response",
-    status: "responding",
-    location: { lat: -26.2061, lng: 28.0463 },
-    profileImage: "/api/placeholder/100/100",
-    yearsExperience: 12,
-    completedJobs: 2103,
-    responseTime: "1.8 mins avg"
-  }
-];
+interface Officer {
+  id: number;
+  name: string;
+  company: string;
+  rating: number;
+  distance: string;
+  estimatedArrival: string;
+  specialization: string;
+  status: string;
+  location: { lat: number; lng: number };
+  profileImage: string;
+  yearsExperience: number;
+  completedJobs: number;
+  responseTime: string;
+}
 
 const Index = () => {
   const [selectedService, setSelectedService] = useState<string>('');
   const [showOfficers, setShowOfficers] = useState(false);
   const [userLocation, setUserLocation] = useState({ lat: -26.2041, lng: 28.0473 });
+  const [nearbyOfficers, setNearbyOfficers] = useState<Officer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Simulate getting user location
+    // Get user location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -80,15 +52,105 @@ const Index = () => {
     }
   }, []);
 
+  const fetchNearbyOfficers = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: officersData, error } = await supabase
+        .from('security_officers')
+        .select(`
+          id,
+          badge_number,
+          status,
+          rating,
+          total_jobs,
+          current_latitude,
+          current_longitude,
+          specializations,
+          profiles!inner(
+            first_name,
+            last_name,
+            phone
+          ),
+          companies!inner(
+            company_name
+          )
+        `)
+        .eq('status', 'available');
+
+      if (error) {
+        console.error('Error fetching officers:', error);
+        return;
+      }
+
+      const formattedOfficers: Officer[] = officersData?.map((officer, index) => ({
+        id: parseInt(officer.id),
+        name: `${officer.profiles.first_name} ${officer.profiles.last_name}`,
+        company: officer.companies.company_name,
+        rating: officer.rating || 4.5,
+        distance: "0.5 km", // Would calculate based on location
+        estimatedArrival: "3-5 mins",
+        specialization: officer.specializations?.[0] || "General Security",
+        status: officer.status,
+        location: { 
+          lat: officer.current_latitude || (userLocation.lat + (Math.random() - 0.5) * 0.01), 
+          lng: officer.current_longitude || (userLocation.lng + (Math.random() - 0.5) * 0.01)
+        },
+        profileImage: "/api/placeholder/100/100",
+        yearsExperience: Math.floor(Math.random() * 10) + 1,
+        completedJobs: officer.total_jobs || 0,
+        responseTime: "2.4 mins avg"
+      })) || [];
+
+      setNearbyOfficers(formattedOfficers);
+    } catch (error) {
+      console.error('Error fetching officers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleServiceSelect = (service: string) => {
     setSelectedService(service);
     setShowOfficers(true);
+    fetchNearbyOfficers();
   };
 
-  const handleRequestOfficer = (officerId: number) => {
-    const officer = nearbyOfficers.find(o => o.id === officerId);
-    if (officer) {
-      alert(`Requesting ${officer.name} from ${officer.company}. Estimated arrival: ${officer.estimatedArrival}`);
+  const handleRequestOfficer = async (officerId: number) => {
+    if (!user) {
+      alert('Please log in to request an officer');
+      return;
+    }
+
+    try {
+      const officer = nearbyOfficers.find(o => o.id === officerId);
+      if (!officer) return;
+
+      // Create service request
+      const { data, error } = await supabase
+        .from('service_requests')
+        .insert({
+          user_id: user.id,
+          service_type: selectedService as any,
+          description: `Requested ${officer.specialization} service`,
+          location_address: 'Current Location', // Would get from geolocation
+          location_latitude: userLocation.lat,
+          location_longitude: userLocation.lng,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating service request:', error);
+        alert('Failed to create service request');
+        return;
+      }
+
+      alert(`Service request created! Request ID: ${data.id.slice(0, 8)}...`);
+    } catch (error) {
+      console.error('Error requesting officer:', error);
+      alert('Failed to request officer');
     }
   };
 
@@ -108,7 +170,7 @@ const Index = () => {
                 <span className="text-sm">Johannesburg, GP</span>
               </div>
               <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10">
-                Profile
+                {user ? 'Profile' : 'Login'}
               </Button>
             </div>
           </div>
@@ -140,15 +202,25 @@ const Index = () => {
                       {nearbyOfficers.filter(o => o.status === 'available').length} Available
                     </Badge>
                   </div>
-                  <div className="space-y-4">
-                    {nearbyOfficers.map((officer) => (
-                      <OfficerCard
-                        key={officer.id}
-                        officer={officer}
-                        onRequest={() => handleRequestOfficer(officer.id)}
-                      />
-                    ))}
-                  </div>
+                  {loading ? (
+                    <div className="text-center py-8">
+                      <p className="text-white/70">Loading available officers...</p>
+                    </div>
+                  ) : nearbyOfficers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-white/70">No officers available at the moment</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {nearbyOfficers.map((officer) => (
+                        <OfficerCard
+                          key={officer.id}
+                          officer={officer}
+                          onRequest={() => handleRequestOfficer(officer.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Card>
             )}
