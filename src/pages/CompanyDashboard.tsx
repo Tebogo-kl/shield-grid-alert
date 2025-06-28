@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Building, Users, Plus, MapPin, Phone, Mail, Shield, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import AddOfficerForm from '@/components/company/AddOfficerForm';
 
 interface Officer {
@@ -25,6 +25,7 @@ const CompanyDashboard = () => {
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchOfficers();
@@ -109,6 +110,8 @@ const CompanyDashboard = () => {
 
   const handleAddOfficer = async (newOfficerData: Omit<Officer, 'id'>) => {
     try {
+      console.log('Starting officer creation process...');
+      
       // Get company ID
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
@@ -118,15 +121,27 @@ const CompanyDashboard = () => {
 
       if (companyError || !companyData) {
         console.error('Company not found:', companyError);
+        toast({
+          title: "Error",
+          description: "Company not found. Please ensure you have a company registered.",
+          variant: "destructive",
+        });
         return;
       }
 
-      // Generate a new UUID for the profile
-      const profileId = crypto.randomUUID();
+      console.log('Company found:', companyData.id);
+
+      // Generate a proper UUID for the profile
+      const { data: uuidData, error: uuidError } = await supabase.rpc('gen_random_uuid');
+      const profileId = uuidData || crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
       
+      console.log('Generated profile ID:', profileId);
+
       // Create profile first
       const [firstName, ...lastNameParts] = newOfficerData.name.split(' ');
       const lastName = lastNameParts.join(' ');
+
+      console.log('Creating profile...', { firstName, lastName, phone: newOfficerData.phone });
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -140,10 +155,29 @@ const CompanyDashboard = () => {
         .select()
         .single();
 
-      if (profileError || !profileData) {
+      if (profileError) {
         console.error('Error creating profile:', profileError);
+        toast({
+          title: "Profile Creation Failed",
+          description: `Failed to create officer profile: ${profileError.message}`,
+          variant: "destructive",
+        });
         return;
       }
+
+      console.log('Profile created successfully:', profileData);
+
+      // Map the form status to database status
+      let dbStatus: 'available' | 'busy' | 'offline' = 'offline';
+      if (newOfficerData.status === 'active') dbStatus = 'available';
+      else if (newOfficerData.status === 'on-patrol') dbStatus = 'busy';
+
+      console.log('Creating security officer...', {
+        user_id: profileData.id,
+        company_id: companyData.id,
+        badge_number: newOfficerData.badge,
+        status: dbStatus
+      });
 
       // Create security officer
       const { data: officerData, error: officerError } = await supabase
@@ -152,7 +186,7 @@ const CompanyDashboard = () => {
           user_id: profileData.id,
           company_id: companyData.id,
           badge_number: newOfficerData.badge,
-          status: 'offline',
+          status: dbStatus,
           specializations: [newOfficerData.certification]
         })
         .select()
@@ -160,14 +194,34 @@ const CompanyDashboard = () => {
 
       if (officerError) {
         console.error('Error creating officer:', officerError);
+        toast({
+          title: "Officer Creation Failed",
+          description: `Failed to create security officer: ${officerError.message}`,
+          variant: "destructive",
+        });
+        
+        // Clean up the profile if officer creation failed
+        await supabase.from('profiles').delete().eq('id', profileData.id);
         return;
       }
+
+      console.log('Officer created successfully:', officerData);
+
+      toast({
+        title: "Success!",
+        description: `Officer ${newOfficerData.name} has been added successfully.`,
+      });
 
       // Refresh the officers list
       await fetchOfficers();
       setShowAddOfficer(false);
     } catch (error) {
-      console.error('Error adding officer:', error);
+      console.error('Unexpected error adding officer:', error);
+      toast({
+        title: "Unexpected Error",
+        description: "An unexpected error occurred while adding the officer. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
