@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Building, Users, Plus, MapPin, Phone, Mail, Shield, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -131,9 +132,8 @@ const CompanyDashboard = () => {
 
       console.log('Company found:', companyData.id);
 
-      // Generate a proper UUID for the profile
-      const { data: uuidData, error: uuidError } = await supabase.rpc('gen_random_uuid');
-      const profileId = uuidData || crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      // Generate a proper UUID for the profile using crypto.randomUUID()
+      const profileId = crypto.randomUUID();
       
       console.log('Generated profile ID:', profileId);
 
