@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Shield, Building, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import UserLoginForm from '@/components/auth/UserLoginForm';
 import UserSignupForm from '@/components/auth/UserSignupForm';
 import CompanyLoginForm from '@/components/auth/CompanyLoginForm';
@@ -13,6 +15,27 @@ type AuthMode = 'select' | 'user-login' | 'user-signup' | 'company-login' | 'com
 
 const Auth = () => {
   const [mode, setMode] = useState<AuthMode>('select');
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect authenticated users to home
+  useEffect(() => {
+    if (user && !loading) {
+      navigate('/home');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return null; // Will redirect to home
+  }
 
   const renderContent = () => {
     switch (mode) {
@@ -46,7 +69,7 @@ const Auth = () => {
                   <User className="h-12 w-12 text-green-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-2">User Account</h3>
                   <p className="text-white/70 text-sm">Request security services on-demand</p>
-                  <Button className="w-full mt-4 bg-green-600 hover:bg-green-700">
+                  <Button className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white">
                     Continue as User
                   </Button>
                 </div>
@@ -60,7 +83,7 @@ const Auth = () => {
                   <Building className="h-12 w-12 text-blue-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-2">Security Company</h3>
                   <p className="text-white/70 text-sm">Manage officers and provide security services</p>
-                  <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">
+                  <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
                     Continue as Company
                   </Button>
                 </div>
@@ -74,7 +97,7 @@ const Auth = () => {
                   <Shield className="h-12 w-12 text-orange-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-2">Security Officer</h3>
                   <p className="text-white/70 text-sm">Access your officer dashboard</p>
-                  <Button className="w-full mt-4 bg-orange-600 hover:bg-orange-700">
+                  <Button className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white">
                     Officer Login
                   </Button>
                 </div>

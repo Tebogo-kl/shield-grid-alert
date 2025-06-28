@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Shield, Clock, Star, Phone } from 'lucide-react';
+import { MapPin, Shield, Clock, Star, Phone, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import SecurityMap from '@/components/SecurityMap';
 import ServiceSelector from '@/components/ServiceSelector';
 import OfficerCard from '@/components/OfficerCard';
 import EmergencyButton from '@/components/EmergencyButton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Officer {
   id: number;
@@ -33,6 +40,14 @@ const Index = () => {
   const [nearbyOfficers, setNearbyOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!user && !loading) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     // Get user location
@@ -181,6 +196,25 @@ const Index = () => {
     }
   };
 
+  const getUserDisplayName = () => {
+    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
+      return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
+    }
+    return user?.email?.split('@')[0] || 'User';
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
       {/* Header */}
@@ -196,9 +230,27 @@ const Index = () => {
                 <MapPin className="h-4 w-4" />
                 <span className="text-sm">Johannesburg, GP</span>
               </div>
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10">
-                {user ? 'Profile' : 'Login'}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-white/30 text-black bg-white hover:bg-white/90">
+                    <User className="h-4 w-4 mr-2" />
+                    {getUserDisplayName()}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-48">
+                  <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                    <User className="h-4 w-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    supabase.auth.signOut();
+                    navigate('/auth');
+                  }} className="cursor-pointer text-red-600">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
