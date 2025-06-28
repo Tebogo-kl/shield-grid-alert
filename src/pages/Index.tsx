@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MapPin, Shield, Clock, Star, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -67,14 +66,8 @@ const Index = () => {
           current_latitude,
           current_longitude,
           specializations,
-          profiles!inner(
-            first_name,
-            last_name,
-            phone
-          ),
-          companies!inner(
-            company_name
-          )
+          user_id,
+          company_id
         `)
         .eq('status', 'available');
 
@@ -83,24 +76,58 @@ const Index = () => {
         return;
       }
 
-      const formattedOfficers: Officer[] = officersData?.map((officer, index) => ({
-        id: parseInt(officer.id),
-        name: `${officer.profiles.first_name} ${officer.profiles.last_name}`,
-        company: officer.companies.company_name,
-        rating: officer.rating || 4.5,
-        distance: "0.5 km", // Would calculate based on location
-        estimatedArrival: "3-5 mins",
-        specialization: officer.specializations?.[0] || "General Security",
-        status: officer.status,
-        location: { 
-          lat: officer.current_latitude || (userLocation.lat + (Math.random() - 0.5) * 0.01), 
-          lng: officer.current_longitude || (userLocation.lng + (Math.random() - 0.5) * 0.01)
-        },
-        profileImage: "/api/placeholder/100/100",
-        yearsExperience: Math.floor(Math.random() * 10) + 1,
-        completedJobs: officer.total_jobs || 0,
-        responseTime: "2.4 mins avg"
-      })) || [];
+      if (!officersData || officersData.length === 0) {
+        setNearbyOfficers([]);
+        return;
+      }
+
+      // Get profiles for these officers
+      const userIds = officersData.map(officer => officer.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, phone')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        return;
+      }
+
+      // Get companies for these officers
+      const companyIds = officersData.map(officer => officer.company_id);
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('id, company_name')
+        .in('id', companyIds);
+
+      if (companiesError) {
+        console.error('Error fetching companies:', companiesError);
+        return;
+      }
+
+      const formattedOfficers: Officer[] = officersData.map((officer, index) => {
+        const profile = profilesData?.find(p => p.id === officer.user_id);
+        const company = companiesData?.find(c => c.id === officer.company_id);
+        
+        return {
+          id: parseInt(officer.id),
+          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown Officer',
+          company: company?.company_name || 'Unknown Company',
+          rating: officer.rating || 4.5,
+          distance: "0.5 km", // Would calculate based on location
+          estimatedArrival: "3-5 mins",
+          specialization: officer.specializations?.[0] || "General Security",
+          status: officer.status,
+          location: { 
+            lat: officer.current_latitude || (userLocation.lat + (Math.random() - 0.5) * 0.01), 
+            lng: officer.current_longitude || (userLocation.lng + (Math.random() - 0.5) * 0.01)
+          },
+          profileImage: "/api/placeholder/100/100",
+          yearsExperience: Math.floor(Math.random() * 10) + 1,
+          completedJobs: officer.total_jobs || 0,
+          responseTime: "2.4 mins avg"
+        };
+      });
 
       setNearbyOfficers(formattedOfficers);
     } catch (error) {

@@ -48,35 +48,56 @@ const CompanyDashboard = () => {
       // Get officers for this company
       const { data: officersData, error: officersError } = await supabase
         .from('security_officers')
-        .select(`
-          id,
-          badge_number,
-          status,
-          created_at,
-          profiles!inner(
-            first_name,
-            last_name,
-            phone
-          )
-        `)
+        .select('id, badge_number, status, created_at, user_id')
         .eq('company_id', companyData.id);
 
       if (officersError) {
         console.error('Error fetching officers:', officersError);
+        setLoading(false);
         return;
       }
 
-      const formattedOfficers = officersData?.map(officer => ({
-        id: officer.id,
-        name: `${officer.profiles.first_name} ${officer.profiles.last_name}`,
-        badge: officer.badge_number,
-        phone: officer.profiles.phone || 'N/A',
-        email: 'N/A', // We don't store email in profiles currently
-        status: officer.status === 'available' ? 'active' : officer.status === 'busy' ? 'on-patrol' : 'off-duty',
-        location: 'Unknown',
-        certification: 'General Security',
-        joinDate: new Date(officer.created_at).toLocaleDateString()
-      })) || [];
+      if (!officersData || officersData.length === 0) {
+        setOfficers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get profiles for these officers
+      const userIds = officersData.map(officer => officer.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, phone')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        setLoading(false);
+        return;
+      }
+
+      // Combine the data
+      const formattedOfficers = officersData.map(officer => {
+        const profile = profilesData?.find(p => p.id === officer.user_id);
+        
+        // Map database status to interface status
+        let status: 'active' | 'off-duty' | 'on-patrol' = 'off-duty';
+        if (officer.status === 'available') status = 'active';
+        else if (officer.status === 'busy') status = 'on-patrol';
+        else status = 'off-duty';
+
+        return {
+          id: officer.id,
+          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',
+          badge: officer.badge_number,
+          phone: profile?.phone || 'N/A',
+          email: 'N/A', // We don't store email in profiles currently
+          status,
+          location: 'Unknown',
+          certification: 'General Security',
+          joinDate: new Date(officer.created_at).toLocaleDateString()
+        };
+      });
 
       setOfficers(formattedOfficers);
     } catch (error) {
@@ -100,6 +121,9 @@ const CompanyDashboard = () => {
         return;
       }
 
+      // Generate a new UUID for the profile
+      const profileId = crypto.randomUUID();
+      
       // Create profile first
       const [firstName, ...lastNameParts] = newOfficerData.name.split(' ');
       const lastName = lastNameParts.join(' ');
@@ -107,6 +131,7 @@ const CompanyDashboard = () => {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .insert({
+          id: profileId,
           first_name: firstName,
           last_name: lastName || '',
           phone: newOfficerData.phone,
