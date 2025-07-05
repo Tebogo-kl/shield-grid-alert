@@ -25,27 +25,41 @@ const CompanyDashboard = () => {
   const [showAddOfficer, setShowAddOfficer] = useState(false);
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchOfficers();
-  }, []);
+    if (user && userProfile) {
+      fetchOfficers();
+    }
+  }, [user, userProfile]);
 
   const fetchOfficers = async () => {
+    if (!user) {
+      console.log('No user found');
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log('Fetching officers for user:', user.id);
+      
       // Get company ID first
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .select('id')
-        .eq('owner_id', user?.id)
+        .eq('owner_id', user.id)
         .single();
 
       if (companyError || !companyData) {
         console.error('Company not found:', companyError);
+        // If no company found, this might be a new company owner
+        setOfficers([]);
         setLoading(false);
         return;
       }
+
+      console.log('Found company:', companyData.id);
 
       // Get officers for this company
       const { data: officersData, error: officersError } = await supabase
@@ -55,11 +69,17 @@ const CompanyDashboard = () => {
 
       if (officersError) {
         console.error('Error fetching officers:', officersError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch officers. Please try again.",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
 
       if (!officersData || officersData.length === 0) {
+        console.log('No officers found for company');
         setOfficers([]);
         setLoading(false);
         return;
@@ -74,6 +94,11 @@ const CompanyDashboard = () => {
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch officer profiles.",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }
@@ -101,36 +126,84 @@ const CompanyDashboard = () => {
         };
       });
 
+      console.log('Formatted officers:', formattedOfficers);
       setOfficers(formattedOfficers);
     } catch (error) {
       console.error('Error fetching officers:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching officers.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddOfficer = async (newOfficerData: Omit<Officer, 'id'>) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to add officers.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       console.log('Starting officer creation process...');
       
-      // Get company ID
-      const { data: companyData, error: companyError } = await supabase
+      // Get or create company
+      let companyData;
+      const { data: existingCompany, error: companyError } = await supabase
         .from('companies')
         .select('id')
-        .eq('owner_id', user?.id)
+        .eq('owner_id', user.id)
         .single();
 
-      if (companyError || !companyData) {
-        console.error('Company not found:', companyError);
+      if (companyError && companyError.code !== 'PGRST116') {
+        console.error('Error checking for company:', companyError);
         toast({
           title: "Error",
-          description: "Company not found. Please ensure you have a company registered.",
+          description: "Failed to verify company information.",
           variant: "destructive",
         });
         return;
       }
 
-      console.log('Company found:', companyData.id);
+      if (!existingCompany) {
+        // Create a default company for this user
+        const { data: newCompany, error: createCompanyError } = await supabase
+          .from('companies')
+          .insert({
+            company_name: `${userProfile?.first_name || 'User'}'s Security Company`,
+            registration_number: `REG-${Date.now()}`,
+            email: user.email || 'company@example.com',
+            phone: newOfficerData.phone || '+27 11 123 4567',
+            address: 'Default Address',
+            contact_person: `${userProfile?.first_name || 'User'} ${userProfile?.last_name || ''}`,
+            contact_title: 'Owner',
+            owner_id: user.id
+          })
+          .select()
+          .single();
+
+        if (createCompanyError) {
+          console.error('Error creating company:', createCompanyError);
+          toast({
+            title: "Error",
+            description: "Failed to create company. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        companyData = newCompany;
+        console.log('Created new company:', companyData);
+      } else {
+        companyData = existingCompany;
+        console.log('Using existing company:', companyData);
+      }
 
       // Generate a proper UUID for the profile using crypto.randomUUID()
       const profileId = crypto.randomUUID();
@@ -180,7 +253,7 @@ const CompanyDashboard = () => {
       });
 
       // Create security officer
-      const { data: officerData, error: officerError } = await supabase
+      const { error: officerError } = await supabase
         .from('security_officers')
         .insert({
           user_id: profileData.id,
@@ -188,9 +261,7 @@ const CompanyDashboard = () => {
           badge_number: newOfficerData.badge,
           status: dbStatus,
           specializations: [newOfficerData.certification]
-        })
-        .select()
-        .single();
+        });
 
       if (officerError) {
         console.error('Error creating officer:', officerError);
@@ -205,7 +276,7 @@ const CompanyDashboard = () => {
         return;
       }
 
-      console.log('Officer created successfully:', officerData);
+      console.log('Officer created successfully');
 
       toast({
         title: "Success!",
@@ -234,6 +305,14 @@ const CompanyDashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
   if (showAddOfficer) {
     return <AddOfficerForm onSubmit={handleAddOfficer} onCancel={() => setShowAddOfficer(false)} />;
   }
@@ -247,7 +326,9 @@ const CompanyDashboard = () => {
             <Building className="h-8 w-8 text-blue-400" />
             <div>
               <h1 className="text-2xl font-bold text-white">Company Dashboard</h1>
-              <p className="text-white/70">Elite Security Solutions</p>
+              <p className="text-white/70">
+                {userProfile?.first_name ? `${userProfile.first_name}'s Security Company` : 'Security Company'}
+              </p>
             </div>
           </div>
           <Button 
@@ -322,11 +403,7 @@ const CompanyDashboard = () => {
             <CardTitle className="text-white">Security Officers</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="text-center py-8">
-                <p className="text-white/70">Loading officers...</p>
-              </div>
-            ) : officers.length === 0 ? (
+            {officers.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-white/70">No officers found. Add your first officer to get started.</p>
               </div>

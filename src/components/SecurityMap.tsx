@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Shield, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Officer {
-  id: number;
+  id: string;
   name: string;
   company: string;
   rating: number;
@@ -16,12 +17,68 @@ interface Officer {
 }
 
 interface SecurityMapProps {
-  officers: Officer[];
   userLocation: { lat: number; lng: number };
   selectedService: string;
 }
 
-const SecurityMap: React.FC<SecurityMapProps> = ({ officers, userLocation, selectedService }) => {
+const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService }) => {
+  const [officers, setOfficers] = useState<Officer[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAvailableOfficers();
+  }, [selectedService]);
+
+  const fetchAvailableOfficers = async () => {
+    try {
+      // Fetch available officers with their profiles and company info
+      const { data: officersData, error: officersError } = await supabase
+        .from('security_officers')
+        .select(`
+          *,
+          profiles:user_id (first_name, last_name),
+          companies:company_id (company_name)
+        `)
+        .eq('status', 'available')
+        .limit(20);
+
+      if (officersError) {
+        console.error('Error fetching officers:', officersError);
+        setOfficers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Format the officers data
+      const formattedOfficers = (officersData || []).map((officer, index) => {
+        const profile = officer.profiles as any;
+        const company = officer.companies as any;
+        
+        return {
+          id: officer.id,
+          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown Officer',
+          company: company?.company_name || 'Unknown Company',
+          rating: officer.rating || 4.5,
+          distance: `${(Math.random() * 5 + 0.5).toFixed(1)} km`,
+          estimatedArrival: `${Math.floor(Math.random() * 20 + 5)} min`,
+          specialization: officer.specializations?.[0] || 'General Security',
+          status: officer.status,
+          location: { 
+            lat: userLocation.lat + (Math.random() - 0.5) * 0.01, 
+            lng: userLocation.lng + (Math.random() - 0.5) * 0.01 
+          }
+        };
+      });
+
+      setOfficers(formattedOfficers);
+    } catch (error) {
+      console.error('Error fetching available officers:', error);
+      setOfficers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available': return 'bg-green-500';
@@ -36,6 +93,17 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ officers, userLocation, selec
   const visibleOfficers = officers.filter(officer => 
     officer.status === 'available' || officer.status === 'responding'
   );
+
+  if (loading) {
+    return (
+      <div className="relative h-96 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg overflow-hidden flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="h-8 w-8 text-gray-400 mx-auto mb-2 animate-pulse" />
+          <p className="text-sm text-gray-600">Loading officers...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-96 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg overflow-hidden">
@@ -113,6 +181,10 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ officers, userLocation, selec
                   <div className="text-xs text-gray-500 mt-1">
                     ETA: {officer.estimatedArrival}
                   </div>
+                  <div className="flex items-center mt-1">
+                    <span className="text-xs text-yellow-500">★</span>
+                    <span className="text-xs text-gray-600 ml-1">{officer.rating}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -145,6 +217,12 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ officers, userLocation, selec
           <div className="bg-white/90 rounded-lg p-4 text-center">
             <Shield className="h-8 w-8 text-gray-400 mx-auto mb-2" />
             <p className="text-sm text-gray-600">No officers available in your area</p>
+            <button 
+              onClick={fetchAvailableOfficers}
+              className="text-xs text-blue-600 mt-2 hover:underline"
+            >
+              Refresh
+            </button>
           </div>
         </div>
       )}

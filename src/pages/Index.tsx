@@ -1,56 +1,24 @@
+
 import React, { useState, useEffect } from 'react';
-import { MapPin, Shield, Clock, Star, Phone, LogOut, User } from 'lucide-react';
+import { Shield, AlertTriangle, MapPin, Clock, Users, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import ServiceSelector from '@/components/ServiceSelector';
+import SecurityMap from '@/components/SecurityMap';
+import EmergencyButton from '@/components/EmergencyButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import SecurityMap from '@/components/SecurityMap';
-import ServiceSelector from '@/components/ServiceSelector';
-import OfficerCard from '@/components/OfficerCard';
-import EmergencyButton from '@/components/EmergencyButton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-interface Officer {
-  id: number;
-  name: string;
-  company: string;
-  rating: number;
-  distance: string;
-  estimatedArrival: string;
-  specialization: string;
-  status: string;
-  location: { lat: number; lng: number };
-  profileImage: string;
-  yearsExperience: number;
-  completedJobs: number;
-  responseTime: string;
-}
 
 const Index = () => {
-  const [selectedService, setSelectedService] = useState<string>('');
-  const [showOfficers, setShowOfficers] = useState(false);
+  const [selectedService, setSelectedService] = useState('');
   const [userLocation, setUserLocation] = useState({ lat: -26.2041, lng: 28.0473 });
-  const [nearbyOfficers, setNearbyOfficers] = useState<Officer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
+  const [locationName, setLocationName] = useState('Johannesburg, South Africa');
+  const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect to auth if not logged in
   useEffect(() => {
-    if (!user && !loading) {
-      navigate('/auth');
-    }
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
-    // Get user location
+    // Get user's location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -58,279 +26,198 @@ const Index = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           });
+          // In a real app, you'd reverse geocode this to get the location name
         },
-        () => {
-          console.log("Using default location");
+        (error) => {
+          console.log('Location access denied, using default location');
         }
       );
     }
   }, []);
 
-  const fetchNearbyOfficers = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: officersData, error } = await supabase
-        .from('security_officers')
-        .select(`
-          id,
-          badge_number,
-          status,
-          rating,
-          total_jobs,
-          current_latitude,
-          current_longitude,
-          specializations,
-          user_id,
-          company_id
-        `)
-        .eq('status', 'available');
-
-      if (error) {
-        console.error('Error fetching officers:', error);
-        return;
-      }
-
-      if (!officersData || officersData.length === 0) {
-        setNearbyOfficers([]);
-        return;
-      }
-
-      // Get profiles for these officers
-      const userIds = officersData.map(officer => officer.user_id);
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, phone')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        return;
-      }
-
-      // Get companies for these officers
-      const companyIds = officersData.map(officer => officer.company_id);
-      const { data: companiesData, error: companiesError } = await supabase
-        .from('companies')
-        .select('id, company_name')
-        .in('id', companyIds);
-
-      if (companiesError) {
-        console.error('Error fetching companies:', companiesError);
-        return;
-      }
-
-      const formattedOfficers: Officer[] = officersData.map((officer, index) => {
-        const profile = profilesData?.find(p => p.id === officer.user_id);
-        const company = companiesData?.find(c => c.id === officer.company_id);
-        
-        return {
-          id: parseInt(officer.id),
-          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown Officer',
-          company: company?.company_name || 'Unknown Company',
-          rating: officer.rating || 4.5,
-          distance: "0.5 km", // Would calculate based on location
-          estimatedArrival: "3-5 mins",
-          specialization: officer.specializations?.[0] || "General Security",
-          status: officer.status,
-          location: { 
-            lat: officer.current_latitude || (userLocation.lat + (Math.random() - 0.5) * 0.01), 
-            lng: officer.current_longitude || (userLocation.lng + (Math.random() - 0.5) * 0.01)
-          },
-          profileImage: "/api/placeholder/100/100",
-          yearsExperience: Math.floor(Math.random() * 10) + 1,
-          completedJobs: officer.total_jobs || 0,
-          responseTime: "2.4 mins avg"
-        };
-      });
-
-      setNearbyOfficers(formattedOfficers);
-    } catch (error) {
-      console.error('Error fetching officers:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleServiceSelect = (service: string) => {
     setSelectedService(service);
-    setShowOfficers(true);
-    fetchNearbyOfficers();
   };
 
-  const handleRequestOfficer = async (officerId: number) => {
-    if (!user) {
-      alert('Please log in to request an officer');
-      return;
-    }
-
-    try {
-      const officer = nearbyOfficers.find(o => o.id === officerId);
-      if (!officer) return;
-
-      // Create service request
-      const { data, error } = await supabase
-        .from('service_requests')
-        .insert({
-          user_id: user.id,
-          service_type: selectedService as any,
-          description: `Requested ${officer.specialization} service`,
-          location_address: 'Current Location', // Would get from geolocation
-          location_latitude: userLocation.lat,
-          location_longitude: userLocation.lng,
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating service request:', error);
-        alert('Failed to create service request');
-        return;
-      }
-
-      alert(`Service request created! Request ID: ${data.id.slice(0, 8)}...`);
-    } catch (error) {
-      console.error('Error requesting officer:', error);
-      alert('Failed to request officer');
+  const handleDashboardNavigation = () => {
+    if (userProfile?.role === 'company_admin') {
+      navigate('/company-dashboard');
+    } else if (userProfile?.role === 'security_officer') {
+      navigate('/officer-dashboard');
+    } else {
+      // Regular user stays on this page
     }
   };
-
-  const getUserDisplayName = () => {
-    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
-      return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
-    }
-    return user?.email?.split('@')[0] || 'User';
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null; // Will redirect to auth
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900">
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-md border-b border-white/20">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Shield className="h-8 w-8 text-blue-400" />
-              <h1 className="text-2xl font-bold text-white">SecureCall</h1>
+      <header className="p-4 border-b border-white/10">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Shield className="h-8 w-8 text-blue-400" />
+            <div>
+              <h1 className="text-xl font-bold text-white">SecureGuard</h1>
+              <p className="text-xs text-white/70">On-Demand Security Services</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-white/80">
-                <MapPin className="h-4 w-4" />
-                <span className="text-sm">Johannesburg, GP</span>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="border-white/30 text-black bg-white hover:bg-white/90">
-                    <User className="h-4 w-4 mr-2" />
-                    {getUserDisplayName()}
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <div className="flex items-center space-x-4">
+                <div className="text-right">
+                  <p className="text-sm text-white">
+                    {userProfile?.first_name} {userProfile?.last_name}
+                  </p>
+                  <p className="text-xs text-white/70 capitalize">
+                    {userProfile?.role?.replace('_', ' ') || 'User'}
+                  </p>
+                </div>
+                {userProfile?.role !== 'user' && (
+                  <Button 
+                    onClick={handleDashboardNavigation}
+                    variant="outline" 
+                    size="sm"
+                    className="border-white/20 text-white hover:bg-white/10"
+                  >
+                    Dashboard
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-48">
-                  <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
-                    <User className="h-4 w-4 mr-2" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    supabase.auth.signOut();
-                    navigate('/auth');
-                  }} className="cursor-pointer text-red-600">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                )}
+                <Button 
+                  onClick={signOut}
+                  variant="outline" 
+                  size="sm"
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Button 
+                onClick={() => navigate('/auth')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Left Panel - Services and Officers */}
-          <div className="space-y-6">
+      <div className="max-w-7xl mx-auto p-4">
+        {/* Location Header */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-2 text-white/70 mb-2">
+            <MapPin className="h-4 w-4" />
+            <span className="text-sm">{locationName}</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Request Security Services</h2>
+          <p className="text-white/70">Choose from our range of professional security services available 24/7</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Service Selection */}
+          <div className="lg:col-span-1 space-y-6">
+            <ServiceSelector onServiceSelect={handleServiceSelect} />
+            
             {/* Emergency Button */}
-            <EmergencyButton />
-
-            {/* Service Selection */}
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
-              <div className="p-6">
-                <h2 className="text-xl font-semibold text-white mb-4">Select Security Service</h2>
-                <ServiceSelector onServiceSelect={handleServiceSelect} selectedService={selectedService} />
-              </div>
+            <Card className="bg-red-600/20 border-red-500/50">
+              <CardContent className="p-4">
+                <EmergencyButton />
+              </CardContent>
             </Card>
-
-            {/* Nearby Officers */}
-            {showOfficers && (
-              <Card className="bg-white/10 backdrop-blur-md border-white/20">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-white">Nearby Officers</h2>
-                    <Badge variant="secondary" className="bg-green-500/20 text-green-300">
-                      {nearbyOfficers.filter(o => o.status === 'available').length} Available
-                    </Badge>
-                  </div>
-                  {loading ? (
-                    <div className="text-center py-8">
-                      <p className="text-white/70">Loading available officers...</p>
-                    </div>
-                  ) : nearbyOfficers.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-white/70">No officers available at the moment</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {nearbyOfficers.map((officer) => (
-                        <OfficerCard
-                          key={officer.id}
-                          officer={officer}
-                          onRequest={() => handleRequestOfficer(officer.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-white/10 backdrop-blur-md border-white/20 p-4 text-center">
-                <div className="text-2xl font-bold text-blue-400">24/7</div>
-                <div className="text-sm text-white/80">Available</div>
-              </Card>
-              <Card className="bg-white/10 backdrop-blur-md border-white/20 p-4 text-center">
-                <div className="text-2xl font-bold text-green-400">2.3min</div>
-                <div className="text-sm text-white/80">Avg Response</div>
-              </Card>
-              <Card className="bg-white/10 backdrop-blur-md border-white/20 p-4 text-center">
-                <div className="text-2xl font-bold text-yellow-400">4.8★</div>
-                <div className="text-sm text-white/80">Rating</div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Right Panel - Map */}
-          <div className="lg:sticky lg:top-8">
-            <Card className="bg-white/10 backdrop-blur-md border-white/20 overflow-hidden">
-              <SecurityMap 
-                officers={nearbyOfficers} 
-                userLocation={userLocation}
-                selectedService={selectedService}
-              />
+            <Card className="bg-white/10 border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white text-lg">Service Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-white/70">
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4" />
+                    <span className="text-sm">Available Officers</span>
+                  </div>
+                  <Badge className="bg-green-500/20 text-green-400">24</Badge>
+                </div>
+                <div className="flex items-center justify-between text-white/70">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="text-sm">Avg Response Time</span>
+                  </div>
+                  <Badge className="bg-blue-500/20 text-blue-400">8 min</Badge>
+                </div>
+                <div className="flex items-center justify-between text-white/70">
+                  <div className="flex items-center space-x-2">
+                    <Star className="h-4 w-4" />
+                    <span className="text-sm">Service Rating</span>
+                  </div>
+                  <Badge className="bg-yellow-500/20 text-yellow-400">4.8/5</Badge>
+                </div>
+              </CardContent>
             </Card>
           </div>
+
+          {/* Map Area */}
+          <div className="lg:col-span-2">
+            <Card className="bg-white/10 border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">Available Officers Near You</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SecurityMap 
+                  userLocation={userLocation}
+                  selectedService={selectedService}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Request Button */}
+            {selectedService && (
+              <div className="mt-4">
+                <Button 
+                  className="w-full bg-blue-600 hover:bg-blue-700 py-6 text-lg"
+                  disabled={!user}
+                >
+                  {user ? (
+                    <>
+                      <Shield className="h-5 w-5 mr-2" />
+                      Request {selectedService.replace('_', ' ')} Service
+                    </>
+                  ) : (
+                    'Sign in to request services'
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Service Features */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-6 text-center">
+              <Shield className="h-12 w-12 text-blue-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">Professional Officers</h3>
+              <p className="text-white/70 text-sm">Trained and certified security professionals ready to serve</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-6 text-center">
+              <Clock className="h-12 w-12 text-green-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">Fast Response</h3>
+              <p className="text-white/70 text-sm">Average response time under 10 minutes in urban areas</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-6 text-center">
+              <MapPin className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">GPS Tracking</h3>
+              <p className="text-white/70 text-sm">Real-time officer location and arrival updates</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
