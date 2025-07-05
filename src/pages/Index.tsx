@@ -118,7 +118,10 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Service Selection */}
           <div className="lg:col-span-1 space-y-6">
-            <ServiceSelector onServiceSelect={handleServiceSelect} />
+            <ServiceSelector 
+              onServiceSelect={handleServiceSelect} 
+              selectedService={selectedService}
+            />
             
             {/* Emergency Button */}
             <Card className="bg-red-600/20 border-red-500/50">
@@ -182,7 +185,7 @@ const Index = () => {
                   {user ? (
                     <>
                       <Shield className="h-5 w-5 mr-2" />
-                      Request {selectedService.replace('_', ' ')} Service
+                      Request {selectedService.replace('-', ' ').replace('_', ' ')} Service
                     </>
                   ) : (
                     'Sign in to request services'
