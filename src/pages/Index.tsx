@@ -1,227 +1,65 @@
 
-import React, { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, MapPin, Clock, Users, Star } from 'lucide-react';
+import React from 'react';
+import { Shield, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import ServiceSelector from '@/components/ServiceSelector';
-import SecurityMap from '@/components/SecurityMap';
-import EmergencyButton from '@/components/EmergencyButton';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const [selectedService, setSelectedService] = useState('');
-  const [userLocation, setUserLocation] = useState({ lat: -26.2041, lng: 28.0473 });
-  const [locationName, setLocationName] = useState('Johannesburg, South Africa');
   const { user, userProfile, signOut } = useAuth();
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          // In a real app, you'd reverse geocode this to get the location name
-        },
-        (error) => {
-          console.log('Location access denied, using default location');
-        }
-      );
-    }
-  }, []);
-
-  const handleServiceSelect = (service: string) => {
-    setSelectedService(service);
-  };
-
-  const handleDashboardNavigation = () => {
-    if (userProfile?.role === 'company_admin') {
-      navigate('/company-dashboard');
-    } else if (userProfile?.role === 'security_officer') {
-      navigate('/officer-dashboard');
-    } else {
-      // Regular user stays on this page
-    }
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900">
-      {/* Header */}
-      <header className="p-4 border-b border-white/10">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-3">
             <Shield className="h-8 w-8 text-blue-400" />
             <div>
-              <h1 className="text-xl font-bold text-white">SecureGuard</h1>
-              <p className="text-xs text-white/70">On-Demand Security Services</p>
+              <h1 className="text-2xl font-bold text-white">SecureCall</h1>
+              <p className="text-white/70">Welcome back!</p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-4">
-            {user ? (
-              <div className="flex items-center space-x-4">
-                <div className="text-right">
-                  <p className="text-sm text-white">
-                    {userProfile?.first_name} {userProfile?.last_name}
-                  </p>
-                  <p className="text-xs text-white/70 capitalize">
-                    {userProfile?.role?.replace('_', ' ') || 'User'}
-                  </p>
-                </div>
-                {userProfile?.role !== 'user' && (
-                  <Button 
-                    onClick={handleDashboardNavigation}
-                    variant="outline" 
-                    size="sm"
-                    className="border-white/20 text-white hover:bg-white/10"
-                  >
-                    Dashboard
-                  </Button>
-                )}
-                <Button 
-                  onClick={signOut}
-                  variant="outline" 
-                  size="sm"
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  Sign Out
-                </Button>
-              </div>
-            ) : (
-              <Button 
-                onClick={() => navigate('/auth')}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Sign In
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto p-4">
-        {/* Location Header */}
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 text-white/70 mb-2">
-            <MapPin className="h-4 w-4" />
-            <span className="text-sm">{locationName}</span>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Request Security Services</h2>
-          <p className="text-white/70">Choose from our range of professional security services available 24/7</p>
+          <Button 
+            onClick={handleSignOut}
+            variant="outline"
+            className="border-white/20 text-white/70 hover:bg-white/10"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Service Selection */}
-          <div className="lg:col-span-1 space-y-6">
-            <ServiceSelector 
-              onServiceSelect={handleServiceSelect} 
-              selectedService={selectedService}
-            />
-            
-            {/* Emergency Button */}
-            <Card className="bg-red-600/20 border-red-500/50">
-              <CardContent className="p-4">
-                <EmergencyButton />
-              </CardContent>
-            </Card>
+        {/* User Info Card */}
+        <Card className="bg-white/10 border-white/20 mb-8">
+          <CardHeader>
+            <CardTitle className="text-white">User Profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-white/80">
+              <p><strong>Name:</strong> {userProfile?.first_name} {userProfile?.last_name}</p>
+              <p><strong>Email:</strong> {user?.email}</p>
+              {userProfile?.phone && <p><strong>Phone:</strong> {userProfile.phone}</p>}
+              {userProfile?.address && <p><strong>Address:</strong> {userProfile.address}</p>}
+              <p><strong>Role:</strong> {userProfile?.role || 'user'}</p>
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Quick Stats */}
-            <Card className="bg-white/10 border-white/20">
-              <CardHeader>
-                <CardTitle className="text-white text-lg">Service Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between text-white/70">
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4" />
-                    <span className="text-sm">Available Officers</span>
-                  </div>
-                  <Badge className="bg-green-500/20 text-green-400">24</Badge>
-                </div>
-                <div className="flex items-center justify-between text-white/70">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-sm">Avg Response Time</span>
-                  </div>
-                  <Badge className="bg-blue-500/20 text-blue-400">8 min</Badge>
-                </div>
-                <div className="flex items-center justify-between text-white/70">
-                  <div className="flex items-center space-x-2">
-                    <Star className="h-4 w-4" />
-                    <span className="text-sm">Service Rating</span>
-                  </div>
-                  <Badge className="bg-yellow-500/20 text-yellow-400">4.8/5</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Map Area */}
-          <div className="lg:col-span-2">
-            <Card className="bg-white/10 border-white/20">
-              <CardHeader>
-                <CardTitle className="text-white">Available Officers Near You</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SecurityMap 
-                  userLocation={userLocation}
-                  selectedService={selectedService}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Request Button */}
-            {selectedService && (
-              <div className="mt-4">
-                <Button 
-                  className="w-full bg-blue-600 hover:bg-blue-700 py-6 text-lg"
-                  disabled={!user}
-                >
-                  {user ? (
-                    <>
-                      <Shield className="h-5 w-5 mr-2" />
-                      Request {selectedService.replace('-', ' ').replace('_', ' ')} Service
-                    </>
-                  ) : (
-                    'Sign in to request services'
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Service Features */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 text-center">
-              <Shield className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">Professional Officers</h3>
-              <p className="text-white/70 text-sm">Trained and certified security professionals ready to serve</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 text-center">
-              <Clock className="h-12 w-12 text-green-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">Fast Response</h3>
-              <p className="text-white/70 text-sm">Average response time under 10 minutes in urban areas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 text-center">
-              <MapPin className="h-12 w-12 text-purple-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">GPS Tracking</h3>
-              <p className="text-white/70 text-sm">Real-time officer location and arrival updates</p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Welcome Message */}
+        <Card className="bg-white/10 border-white/20">
+          <CardContent className="p-8 text-center">
+            <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Welcome to SecureCall</h2>
+            <p className="text-white/70">
+              Your secure authentication system is working perfectly! You are now logged in and can access protected areas of the application.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

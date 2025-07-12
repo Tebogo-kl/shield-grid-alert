@@ -8,7 +8,7 @@ interface PublicRouteProps {
 }
 
 const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
-  const { user, userProfile, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   // Show loading while checking authentication
   if (loading) {
@@ -19,15 +19,9 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
     );
   }
 
-  // Redirect authenticated users to appropriate dashboard
-  if (user && userProfile) {
-    const redirectPath = userProfile.role === 'company_admin' 
-      ? '/company-dashboard' 
-      : userProfile.role === 'security_officer'
-        ? '/officer-dashboard'
-        : '/home';
-    
-    return <Navigate to={redirectPath} replace />;
+  // Redirect authenticated users to home
+  if (user) {
+    return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;

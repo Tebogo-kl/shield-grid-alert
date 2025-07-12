@@ -5,16 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'user' | 'company_admin' | 'security_officer';
   redirectTo?: string;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requiredRole,
   redirectTo = '/auth' 
 }) => {
-  const { user, userProfile, loading } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
   // Show loading while checking authentication
@@ -29,18 +27,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Redirect to auth if not authenticated
   if (!user) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
-  }
-
-  // Check role-based access if requiredRole is specified
-  if (requiredRole && userProfile?.role !== requiredRole) {
-    // Redirect based on user's actual role
-    const redirectPath = userProfile?.role === 'company_admin' 
-      ? '/company-dashboard' 
-      : userProfile?.role === 'security_officer'
-        ? '/officer-dashboard'
-        : '/home';
-    
-    return <Navigate to={redirectPath} replace />;
   }
 
   return <>{children}</>;

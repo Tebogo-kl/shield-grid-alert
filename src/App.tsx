@@ -7,8 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import CompanyDashboard from "./pages/CompanyDashboard";
-import OfficerDashboard from "./pages/OfficerDashboard";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
@@ -30,22 +28,10 @@ const App = () => (
               </PublicRoute>
             } />
             
-            {/* Protected routes with role-based access */}
+            {/* Protected routes */}
             <Route path="/home" element={
               <ProtectedRoute>
                 <Index />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/company-dashboard" element={
-              <ProtectedRoute requiredRole="company_admin">
-                <CompanyDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/officer-dashboard" element={
-              <ProtectedRoute requiredRole="security_officer">
-                <OfficerDashboard />
               </ProtectedRoute>
             } />
             
