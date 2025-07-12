@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,9 +60,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isAuthenticated = !!user && !!session;
+  const isAuthenticated = !!user && !!session || !!userProfile;
 
+  // Check for temporary user on initialization
   useEffect(() => {
+    const tempUser = localStorage.getItem('temp_user');
+    if (tempUser) {
+      const parsedUser = JSON.parse(tempUser);
+      setUserProfile(parsedUser);
+      setLoading(false);
+      return;
+    }
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -169,6 +179,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setLoading(true);
+      
+      // Clear temporary user if exists
+      localStorage.removeItem('temp_user');
+      
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
