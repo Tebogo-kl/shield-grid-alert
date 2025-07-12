@@ -56,7 +56,7 @@ const Index = () => {
             <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Welcome to SecureCall</h2>
             <p className="text-white/70">
-              Your secure authentication system is working perfectly! You are now logged in and can access protected areas of the application.
+              Your secure authentication system is working perfectly! You are now logged in and can access your personal profile.
             </p>
           </CardContent>
         </Card>

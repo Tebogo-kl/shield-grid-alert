@@ -56,7 +56,7 @@ const Auth = () => {
                 <Shield className="h-12 w-12 text-blue-400 mr-3" />
                 <h1 className="text-3xl font-bold text-white">SecureCall</h1>
               </div>
-              <p className="text-white/70">Welcome back! Please sign in to continue</p>
+              <p className="text-white/70">Welcome! Please sign in to continue</p>
             </div>
 
             <div className="grid gap-4">
