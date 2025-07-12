@@ -14,6 +14,8 @@ interface AuthContextType {
   officerSignIn: (name: string, badgeNumber: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  isAuthenticated: boolean;
+  hasRole: (role: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +62,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const isAuthenticated = !!user && !!session;
+  
+  const hasRole = (role: string) => {
+    return userProfile?.role === role;
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -98,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, metadata?: any) => {
     try {
+      setLoading(true);
       const redirectUrl = `${window.location.origin}/`;
       
       const { error } = await supabase.auth.signUp({
@@ -130,11 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: "destructive",
       });
       return { error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -156,11 +168,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: "destructive",
       });
       return { error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const officerSignIn = async (name: string, badgeNumber: string) => {
     try {
+      setLoading(true);
+      
       // First, find the security officer by badge number
       const { data: officer, error: officerError } = await supabase
         .from('security_officers')
@@ -247,11 +263,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: "destructive",
       });
       return { error };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
     try {
+      setLoading(true);
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
@@ -266,6 +285,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -279,6 +300,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     officerSignIn,
     signOut,
     refreshProfile,
+    isAuthenticated,
+    hasRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -4,7 +4,7 @@ import { ArrowLeft, Shield, Building, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import UserLoginForm from '@/components/auth/UserLoginForm';
 import UserSignupForm from '@/components/auth/UserSignupForm';
 import CompanyLoginForm from '@/components/auth/CompanyLoginForm';
@@ -15,15 +15,27 @@ type AuthMode = 'select' | 'user-login' | 'user-signup' | 'company-login' | 'com
 
 const Auth = () => {
   const [mode, setMode] = useState<AuthMode>('select');
-  const { user, loading } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Redirect authenticated users to home
+  // Get the redirect path from location state or default paths
+  const getRedirectPath = () => {
+    const from = location.state?.from?.pathname;
+    if (from && from !== '/auth') return from;
+    
+    if (userProfile?.role === 'company_admin') return '/company-dashboard';
+    if (userProfile?.role === 'security_officer') return '/officer-dashboard';
+    return '/home';
+  };
+
+  // Redirect authenticated users
   useEffect(() => {
-    if (user && !loading) {
-      navigate('/home');
+    if (user && userProfile && !loading) {
+      const redirectPath = getRedirectPath();
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, userProfile, loading, navigate]);
 
   if (loading) {
     return (
@@ -33,8 +45,8 @@ const Auth = () => {
     );
   }
 
-  if (user) {
-    return null; // Will redirect to home
+  if (user && userProfile) {
+    return null; // Will redirect
   }
 
   const renderContent = () => {

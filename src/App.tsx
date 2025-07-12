@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import CompanyDashboard from "./pages/CompanyDashboard";
 import OfficerDashboard from "./pages/OfficerDashboard";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PublicRoute from "./components/auth/PublicRoute";
 
 const queryClient = new QueryClient();
 
@@ -21,12 +23,36 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public routes - redirect if authenticated */}
+            <Route path="/auth" element={
+              <PublicRoute>
+                <Auth />
+              </PublicRoute>
+            } />
+            
+            {/* Protected routes with role-based access */}
+            <Route path="/home" element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/company-dashboard" element={
+              <ProtectedRoute requiredRole="company_admin">
+                <CompanyDashboard />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/officer-dashboard" element={
+              <ProtectedRoute requiredRole="security_officer">
+                <OfficerDashboard />
+              </ProtectedRoute>
+            } />
+            
+            {/* Default redirect to auth for unauthenticated users */}
             <Route path="/" element={<Navigate to="/auth" replace />} />
-            <Route path="/home" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/company-dashboard" element={<CompanyDashboard />} />
-            <Route path="/officer-dashboard" element={<OfficerDashboard />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
