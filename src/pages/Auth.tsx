@@ -1,34 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, User } from 'lucide-react';
+import { ArrowLeft, Shield, Building, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import UserLoginForm from '@/components/auth/UserLoginForm';
 import UserSignupForm from '@/components/auth/UserSignupForm';
+import CompanyLoginForm from '@/components/auth/CompanyLoginForm';
+import CompanySignupForm from '@/components/auth/CompanySignupForm';
+import OfficerLoginForm from '@/components/auth/OfficerLoginForm';
 
-type AuthMode = 'select' | 'user-login' | 'user-signup';
+type AuthMode = 'select' | 'user-login' | 'user-signup' | 'company-login' | 'company-signup' | 'officer-login';
 
 const Auth = () => {
   const [mode, setMode] = useState<AuthMode>('select');
-  const { user, userProfile, loading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  // Get the redirect path from location state or default to home
-  const getRedirectPath = () => {
-    const from = location.state?.from?.pathname;
-    if (from && from !== '/auth') return from;
-    return '/home';
-  };
-
-  // Redirect authenticated users
+  // Redirect authenticated users to home
   useEffect(() => {
-    if (user && userProfile && !loading) {
-      const redirectPath = getRedirectPath();
-      navigate(redirectPath, { replace: true });
+    if (user && !loading) {
+      navigate('/home');
     }
-  }, [user, userProfile, loading, navigate]);
+  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -38,8 +33,8 @@ const Auth = () => {
     );
   }
 
-  if (user && userProfile) {
-    return null; // Will redirect
+  if (user) {
+    return null; // Will redirect to home
   }
 
   const renderContent = () => {
@@ -48,6 +43,12 @@ const Auth = () => {
         return <UserLoginForm onBack={() => setMode('select')} onSignup={() => setMode('user-signup')} />;
       case 'user-signup':
         return <UserSignupForm onBack={() => setMode('select')} onLogin={() => setMode('user-login')} />;
+      case 'company-login':
+        return <CompanyLoginForm onBack={() => setMode('select')} onSignup={() => setMode('company-signup')} />;
+      case 'company-signup':
+        return <CompanySignupForm onBack={() => setMode('select')} onLogin={() => setMode('company-login')} />;
+      case 'officer-login':
+        return <OfficerLoginForm onBack={() => setMode('select')} />;
       default:
         return (
           <div className="space-y-6">
@@ -56,7 +57,7 @@ const Auth = () => {
                 <Shield className="h-12 w-12 text-blue-400 mr-3" />
                 <h1 className="text-3xl font-bold text-white">SecureCall</h1>
               </div>
-              <p className="text-white/70">Welcome! Please sign in to continue</p>
+              <p className="text-white/70">Choose your account type to get started</p>
             </div>
 
             <div className="grid gap-4">
@@ -66,22 +67,41 @@ const Auth = () => {
               >
                 <div className="p-6 text-center">
                   <User className="h-12 w-12 text-green-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">Sign In</h3>
-                  <p className="text-white/70 text-sm">Access your account</p>
+                  <h3 className="text-xl font-semibold text-white mb-2">User Account</h3>
+                  <p className="text-white/70 text-sm">Request security services on-demand</p>
+                  <Button className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white">
+                    Continue as User
+                  </Button>
                 </div>
               </Card>
-            </div>
 
-            <div className="text-center">
-              <p className="text-white/70 text-sm">
-                Don't have an account?{' '}
-                <button 
-                  onClick={() => setMode('user-signup')}
-                  className="text-blue-400 hover:text-blue-300 underline"
-                >
-                  Sign up here
-                </button>
-              </p>
+              <Card 
+                className="cursor-pointer transition-all duration-200 hover:scale-105 bg-white/10 border-white/20 hover:bg-white/20"
+                onClick={() => setMode('company-login')}
+              >
+                <div className="p-6 text-center">
+                  <Building className="h-12 w-12 text-blue-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Security Company</h3>
+                  <p className="text-white/70 text-sm">Manage officers and provide security services</p>
+                  <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
+                    Continue as Company
+                  </Button>
+                </div>
+              </Card>
+
+              <Card 
+                className="cursor-pointer transition-all duration-200 hover:scale-105 bg-white/10 border-white/20 hover:bg-white/20"
+                onClick={() => setMode('officer-login')}
+              >
+                <div className="p-6 text-center">
+                  <Shield className="h-12 w-12 text-orange-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Security Officer</h3>
+                  <p className="text-white/70 text-sm">Access your officer dashboard</p>
+                  <Button className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white">
+                    Officer Login
+                  </Button>
+                </div>
+              </Card>
             </div>
           </div>
         );

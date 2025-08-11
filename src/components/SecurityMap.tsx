@@ -1,24 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Shield } from 'lucide-react';
+import { MapPin, Shield, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { mockOfficers } from '@/mocks/officers';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Officer {
   id: string;
-  badge_number: string;
-  hourly_rate: number;
+  name: string;
+  company: string;
   rating: number;
-  total_jobs: number;
-  specializations: string[];
+  distance: string;
+  estimatedArrival: string;
+  specialization: string;
   status: string;
-  profiles: {
-    first_name: string;
-    last_name: string;
-  };
-  companies: {
-    company_name: string;
-  };
   location: { lat: number; lng: number };
 }
 
@@ -37,20 +31,48 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
 
   const fetchAvailableOfficers = async () => {
     try {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 300));
+      // Fetch available officers with their profiles and company info
+      const { data: officersData, error: officersError } = await supabase
+        .from('security_officers')
+        .select(`
+          *,
+          profiles:user_id (first_name, last_name),
+          companies:company_id (company_name)
+        `)
+        .eq('status', 'available')
+        .limit(20);
 
-      const formattedOfficers = mockOfficers.map((officer, index) => ({
-        ...officer,
-        location: {
-          lat: userLocation.lat + (Math.random() - 0.5) * 0.01,
-          lng: userLocation.lng + (Math.random() - 0.5) * 0.01,
-        },
-      }));
+      if (officersError) {
+        console.error('Error fetching officers:', officersError);
+        setOfficers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Format the officers data
+      const formattedOfficers = (officersData || []).map((officer, index) => {
+        const profile = officer.profiles as any;
+        const company = officer.companies as any;
+        
+        return {
+          id: officer.id,
+          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown Officer',
+          company: company?.company_name || 'Unknown Company',
+          rating: officer.rating || 4.5,
+          distance: `${(Math.random() * 5 + 0.5).toFixed(1)} km`,
+          estimatedArrival: `${Math.floor(Math.random() * 20 + 5)} min`,
+          specialization: officer.specializations?.[0] || 'General Security',
+          status: officer.status,
+          location: { 
+            lat: userLocation.lat + (Math.random() - 0.5) * 0.01, 
+            lng: userLocation.lng + (Math.random() - 0.5) * 0.01 
+          }
+        };
+      });
 
       setOfficers(formattedOfficers);
     } catch (error) {
-      console.error('Error loading mock officers:', error);
+      console.error('Error fetching available officers:', error);
       setOfficers([]);
     } finally {
       setLoading(false);
@@ -66,6 +88,11 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
       default: return 'bg-gray-500';
     }
   };
+
+  // Filter officers based on status - only show available and responding officers
+  const visibleOfficers = officers.filter(officer => 
+    officer.status === 'available' || officer.status === 'responding'
+  );
 
   if (loading) {
     return (
@@ -97,7 +124,11 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span>Available ({officers.filter(o => o.status === 'available').length})</span>
+            <span>Available ({visibleOfficers.filter(o => o.status === 'available').length})</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+            <span>Responding ({visibleOfficers.filter(o => o.status === 'responding').length})</span>
           </div>
         </div>
       </div>
@@ -116,8 +147,8 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
         </div>
 
         {/* Security Officers */}
-        {officers.map((officer, index) => {
-          const angle = (index * 360) / Math.max(officers.length, 1);
+        {visibleOfficers.map((officer, index) => {
+          const angle = (index * 360) / Math.max(visibleOfficers.length, 1);
           const radius = 60 + (index * 20);
           const x = 50 + radius * Math.cos((angle * Math.PI) / 180);
           const y = 50 + radius * Math.sin((angle * Math.PI) / 180);
@@ -138,23 +169,21 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
                 
                 {/* Officer Info Tooltip */}
                 <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-lg p-3 shadow-lg min-w-48 z-20">
-                  <div className="text-sm font-medium text-gray-900">
-                    {officer.profiles.first_name} {officer.profiles.last_name}
-                  </div>
-                  <div className="text-xs text-gray-600">{officer.companies.company_name}</div>
-                  <div className="text-xs text-blue-600 mt-1">
-                    {officer.specializations?.[0] || 'General Security'}
-                  </div>
+                  <div className="text-sm font-medium text-gray-900">{officer.name}</div>
+                  <div className="text-xs text-gray-600">{officer.company}</div>
+                  <div className="text-xs text-blue-600 mt-1">{officer.specialization}</div>
                   <div className="flex items-center justify-between mt-2 text-xs">
-                    <span className="text-gray-600">${officer.hourly_rate}/hr</span>
+                    <span className="text-gray-600">{officer.distance}</span>
                     <Badge variant="outline" className={`text-xs ${getStatusColor(officer.status)} text-white border-0`}>
                       {officer.status}
                     </Badge>
                   </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    ETA: {officer.estimatedArrival}
+                  </div>
                   <div className="flex items-center mt-1">
                     <span className="text-xs text-yellow-500">★</span>
                     <span className="text-xs text-gray-600 ml-1">{officer.rating}</span>
-                    <span className="text-xs text-gray-500 ml-2">({officer.total_jobs} jobs)</span>
                   </div>
                 </div>
               </div>
@@ -178,12 +207,12 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
       {/* Service Filter Indicator */}
       {selectedService && (
         <div className="absolute bottom-4 left-4 z-10 bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
-          Showing: {selectedService.replace('_', ' ').replace('-', ' ')}
+          Showing: {selectedService.replace('_', ' ')}
         </div>
       )}
 
       {/* No Officers Message */}
-      {officers.length === 0 && (
+      {visibleOfficers.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="bg-white/90 rounded-lg p-4 text-center">
             <Shield className="h-8 w-8 text-gray-400 mx-auto mb-2" />

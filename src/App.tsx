@@ -7,9 +7,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import CompanyDashboard from "./pages/CompanyDashboard";
+import OfficerDashboard from "./pages/OfficerDashboard";
 import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import PublicRoute from "./components/auth/PublicRoute";
 
 const queryClient = new QueryClient();
 
@@ -21,24 +21,12 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Public routes - redirect if authenticated */}
-            <Route path="/auth" element={
-              <PublicRoute>
-                <Auth />
-              </PublicRoute>
-            } />
-            
-            {/* Protected routes */}
-            <Route path="/home" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } />
-            
-            {/* Default redirect to auth for unauthenticated users */}
             <Route path="/" element={<Navigate to="/auth" replace />} />
-            
-            {/* Catch-all route */}
+            <Route path="/home" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/company-dashboard" element={<CompanyDashboard />} />
+            <Route path="/officer-dashboard" element={<OfficerDashboard />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
