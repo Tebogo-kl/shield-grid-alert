@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { mockOfficers } from '@/mocks/officers';
 
 interface Officer {
   id: string;
@@ -37,35 +37,20 @@ const SecurityMap: React.FC<SecurityMapProps> = ({ userLocation, selectedService
 
   const fetchAvailableOfficers = async () => {
     try {
-      const { data: officersData, error } = await supabase
-        .from('security_officers')
-        .select(`
-          *,
-          profiles:user_id (first_name, last_name),
-          companies:company_id (company_name)
-        `)
-        .eq('status', 'available')
-        .limit(10);
+      setLoading(true);
+      await new Promise((r) => setTimeout(r, 300));
 
-      if (error) {
-        console.error('Error fetching officers:', error);
-        setOfficers([]);
-        setLoading(false);
-        return;
-      }
-
-      // Format the officers data with simulated locations
-      const formattedOfficers = (officersData || []).map((officer, index) => ({
+      const formattedOfficers = mockOfficers.map((officer, index) => ({
         ...officer,
-        location: { 
-          lat: userLocation.lat + (Math.random() - 0.5) * 0.01, 
-          lng: userLocation.lng + (Math.random() - 0.5) * 0.01 
-        }
+        location: {
+          lat: userLocation.lat + (Math.random() - 0.5) * 0.01,
+          lng: userLocation.lng + (Math.random() - 0.5) * 0.01,
+        },
       }));
 
       setOfficers(formattedOfficers);
     } catch (error) {
-      console.error('Error fetching available officers:', error);
+      console.error('Error loading mock officers:', error);
       setOfficers([]);
     } finally {
       setLoading(false);

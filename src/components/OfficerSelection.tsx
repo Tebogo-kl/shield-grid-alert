@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { mockOfficers } from '@/mocks/officers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,29 +50,12 @@ const OfficerSelection: React.FC<OfficerSelectionProps> = ({ selectedService, us
 
   const fetchOfficers = async () => {
     try {
-      const { data: officersData, error } = await supabase
-        .from('security_officers')
-        .select(`
-          *,
-          profiles:user_id (first_name, last_name),
-          companies:company_id (company_name)
-        `)
-        .eq('status', 'available')
-        .not('hourly_rate', 'is', null);
-
-      if (error) {
-        console.error('Error fetching officers:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load officers. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setOfficers(officersData || []);
+      setLoading(true);
+      // Simulate network delay
+      await new Promise((r) => setTimeout(r, 300));
+      setOfficers(mockOfficers);
     } catch (error) {
-      console.error('Error fetching officers:', error);
+      console.error('Error loading mock officers:', error);
       toast({
         title: "Error",
         description: "Failed to load officers. Please try again.",
