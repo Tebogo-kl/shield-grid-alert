@@ -28,7 +28,7 @@ const AddOfficerForm: React.FC<AddOfficerFormProps> = ({ onSubmit, onCancel }) =
     name: '',
     badge: '',
     phone: '',
-    email: '',
+    email: '',  
     status: 'active' as Officer['status'],
     location: '',
     certification: '',
