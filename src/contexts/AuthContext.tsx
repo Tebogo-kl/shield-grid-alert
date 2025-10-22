@@ -12,6 +12,12 @@ interface User {
   phone?: string;
   address?: string;
   role: number;
+  user_metadata?: {
+    first_name?: string;
+    last_name?: string;
+    badge_number?: string;
+    role?: string;
+  };
 }
 
 interface Session {
@@ -71,6 +77,7 @@ interface CreateCompanyDto {
 }
 
 interface AuthContextType {
+  user: User | null;
   Profiles: User | null;
   session: Session | null;
   loading: boolean;
@@ -492,6 +499,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = {
+    user: Profiles,
     Profiles,
     session,
     userProfile,

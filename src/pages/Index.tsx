@@ -4,6 +4,15 @@ import { Shield, AlertTriangle, MapPin, Clock, Users, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import ServiceSelector from '@/components/ServiceSelector';
 import SecurityMap from '@/components/SecurityMap';
 import EmergencyButton from '@/components/EmergencyButton';
@@ -64,34 +73,55 @@ const Index = () => {
           
           <div className="flex items-center space-x-4">
             {user ? (
-              <div className="flex items-center space-x-4">
-                <div className="text-right">
-                  <p className="text-sm text-white">
-                    {userProfile?.first_name} {userProfile?.last_name}
-                  </p>
-                  <p className="text-xs text-white/70 capitalize">
-                    {userProfile?.role?.replace('_', ' ') || 'User'}
-                  </p>
-                </div>
-                {userProfile?.role !== 'user' && (
-                  <Button 
-                    onClick={handleDashboardNavigation}
-                    variant="outline" 
-                    size="sm"
-                    className="border-white/20 text-white hover:bg-white/10"
-                  >
-                    Dashboard
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={userProfile?.avatar_url} alt={`${userProfile?.first_name || 'User'}`} />
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {userProfile?.first_name?.[0]?.toUpperCase() || userProfile?.last_name?.[0]?.toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
                   </Button>
-                )}
-                <Button 
-                  onClick={signOut}
-                  variant="outline" 
-                  size="sm"
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  Sign Out
-                </Button>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 bg-card" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {userProfile?.first_name} {userProfile?.last_name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {userProfile?.role?.replace('_', ' ') || 'User'}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {userProfile?.role !== 'user' && (
+                    <>
+                      <DropdownMenuItem onClick={handleDashboardNavigation} className="cursor-pointer">
+                        Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem className="cursor-pointer">
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer">
+                    Change Profile Image
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer">
+                    View Profile Info
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive">
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Button 
                 onClick={() => navigate('/auth')}

@@ -192,7 +192,11 @@ class QueryBuilder<T> {
 class SupabaseReplacement {
   from<T = any>(table: string): {
     select: (fields?: string) => QueryBuilder<T>;
-    insert: (data: any) => Promise<{ data: T | null; error: any }>;
+    insert: (data: any) => {
+      select: (fields?: string) => {
+        single: () => Promise<{ data: T | null; error: any }>;
+      };
+    } & Promise<{ data: T | null; error: any }>;
     update: (data: any) => {
       eq: (field: string, value: any) => Promise<{ data: T | null; error: any }>;
     };
@@ -206,18 +210,33 @@ class SupabaseReplacement {
         return builder.select(fields);
       },
 
-      insert: async (data: any) => {
-        try {
-          const response = await fetch(`${API_BASE_URL}/${table}`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(data),
-          });
+      insert: (data: any) => {
+        const insertPromise = (async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/${table}`, {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify(data),
+            });
 
-          return await handleResponse<T>(response);
-        } catch (error: any) {
-          return { data: null, error: { message: error.message } };
-        }
+            return await handleResponse<T>(response);
+          } catch (error: any) {
+            return { data: null, error: { message: error.message } };
+          }
+        })();
+
+        // Add select method for chaining
+        const chainable: any = insertPromise;
+        chainable.select = (fields: string = '*') => {
+          return {
+            single: async () => {
+              const result = await insertPromise;
+              return result;
+            },
+          };
+        };
+
+        return chainable;
       },
 
       update: (data: any) => ({
@@ -284,6 +303,25 @@ class SupabaseReplacement {
       return { data: { session: null }, error: null };
     },
 
+    getUser: async () => {
+      const token = localStorage.getItem('authToken');
+      const userStr = localStorage.getItem('user');
+
+      if (token && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          return {
+            data: { user },
+            error: null,
+          };
+        } catch (error) {
+          return { data: { user: null }, error };
+        }
+      }
+
+      return { data: { user: null }, error: null };
+    },
+
     onAuthStateChange: (callback: (event: string, session: any) => void) => {
       // This is a simplified version - the real auth state is managed by AuthContext
       const checkAuth = () => {
@@ -335,6 +373,24 @@ class SupabaseReplacement {
       return { error: null };
     },
   };
+
+  // Real-time subscriptions (stub)
+  channel(name: string) {
+    return {
+      on: (event: string, options: any, callback: any) => {
+        console.log('Real-time subscriptions not implemented with .NET API');
+        return this.channel(name);
+      },
+      subscribe: () => {
+        console.log('Real-time subscriptions not implemented with .NET API');
+        return { unsubscribe: () => {} };
+      },
+    };
+  }
+
+  removeChannel(channel: any) {
+    // No-op for now
+  }
 
   // Storage methods (for file uploads)
   storage = {
