@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,13 +22,22 @@ const UserLoginForm: React.FC<UserLoginFormProps> = ({ onBack, onSignup }) => {
     e.preventDefault();
     setLoading(true);
 
-    // const { error } = await signIn(email, password);
-    
-    if (true) {
-      navigate('/home');
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (!error) {
+        // Login successful - navigate to home
+        console.log('Login successful, navigating to /home');
+        navigate('/home');
+      } else {
+        // Error is already shown in toast by AuthContext
+        console.error('Login failed:', error);
+      }
+    } catch (err) {
+      console.error('Unexpected login error:', err);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (

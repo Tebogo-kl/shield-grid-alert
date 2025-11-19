@@ -54,7 +54,7 @@ const AddOfficerForm: React.FC<AddOfficerFormProps> = ({ onSubmit, onCancel }) =
                 variant="ghost" 
                 size="sm" 
                 onClick={onCancel}
-                className="text-white/70 hover:text-white"
+                className="text-white/70 hover:text-blue"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>

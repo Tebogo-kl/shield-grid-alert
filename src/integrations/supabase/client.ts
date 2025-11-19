@@ -213,7 +213,7 @@ class SupabaseReplacement {
       insert: (data: any) => {
         const insertPromise = (async () => {
           try {
-            const response = await fetch(`${API_BASE_URL}/${table}`, {
+            const response = await fetch(`${API_BASE_URL}/companies`, {
               method: 'POST',
               headers: getAuthHeaders(),
               body: JSON.stringify(data),

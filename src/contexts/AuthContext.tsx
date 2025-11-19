@@ -1,7 +1,4 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
-// import { User, Session } from '@supabase/supabase-js';
-// import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface User {
@@ -13,9 +10,9 @@ interface User {
   address?: string;
   role: number;
   user_metadata?: {
-    first_name?: string;
-    last_name?: string;
-    badge_number?: string;
+    firstName?: string;
+    lastName?: string;
+    badgeNumber?: string;
     role?: string;
   };
 }
@@ -28,57 +25,8 @@ interface Session {
   expiresAt: number;
 }
 
-interface Company {
-  id: string;
-  companyName: string;
-  email: string;
-  phone: string;
-}
-
-interface CreateCompanyDto {
-  companyName: string;
-  registrationNumber: string;
-  email: string;
-  phone: string;
-  address: string;
-  contactPerson: string;
-  contactTitle: string;
-}
- interface ServiceRequest {
-  id: string;
-  serviceType: ServiceType;
-  locationAddress: string;
-  status: RequestStatus;
-  totalCost?: number;
-  createdAt: string;
-}
- interface CreateServiceRequestDto {
-  serviceType: ServiceType;
-  locationLatitude: number;
-  locationLongitude: number;
-  locationAddress: string;
-  description: string;
-  estimatedDuration: number;
-}
- enum ServiceType {
-  ArmedResponse = "ArmedResponse",
-  Patrol = "Patrol",
-  Escort = "Escort",
-  Emergency = "Emergency",
-  Surveillance = "Surveillance"
-}
-
- enum RequestStatus {
-  Pending = "Pending",
-  Accepted = "Accepted",
-  InProgress = "InProgress",
-  Completed = "Completed",
-  Cancelled = "Cancelled"
-}
-
 interface AuthContextType {
   user: User | null;
-  Profiles: User | null;
   session: Session | null;
   loading: boolean;
   userProfile: any;
@@ -103,22 +51,20 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [Profiles, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-   // Fetch user profile from your .NET API
+  // Fetch user profile from your .NET API
   const fetchUserProfile = async (userId: string) => {
     try {
-
-       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/profiles${userId}`, {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/profiles/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-    
         },
       });
 
@@ -137,8 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshProfile = async () => {
-    if (Profiles) {
-      await fetchUserProfile(Profiles.id);
+    if (user) {
+      await fetchUserProfile(user.id);
     }
   };
 
@@ -148,13 +94,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const token = localStorage.getItem('authToken');
       const userStr = localStorage.getItem('user');
 
-        
-        if  (token && userStr) {
-           try {
-          const user = JSON.parse(userStr);
+      if (token && userStr) {
+        try {
+          const userData = JSON.parse(userStr);
           const expiresAt = localStorage.getItem('tokenExpiresAt');
 
-           if (expiresAt && Date.now() > parseInt(expiresAt)) {
+          if (expiresAt && Date.now() > parseInt(expiresAt)) {
             // Token expired, clear auth
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
@@ -162,16 +107,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
             return;
           }
-    
-  setUser(user);
+
+          setUser(userData);
           setSession({
-            user,
+            user: userData,
             accessToken: token,
             expiresIn: expiresAt ? parseInt(expiresAt) - Date.now() : 3600000,
             expiresAt: expiresAt ? parseInt(expiresAt) : Date.now() + 3600000,
           });
 
- await fetchUserProfile(Profiles.id);
+          // Use userData.id instead of user.id since state hasn't updated yet
+          await fetchUserProfile(userData.id);
         } catch (error) {
           console.error('Error parsing stored user:', error);
           localStorage.removeItem('authToken');
@@ -181,68 +127,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setLoading(false);
     };
-    
 
-   checkAuth();
+    checkAuth();
   }, []);
 
- const signUp = async (email: string, password: string, metadata?: any) => {
-  try {
-    // Structure the request body according to your API schema
-    const requestBody = {
-      email,
-      password,
-      firstName: metadata?.firstName || null,
-      lastName: metadata?.lastName || null,
-      phone: metadata?.phone || null,
-      address: metadata?.address || null,
-      role: metadata?.role || 0 // Default to role 0, adjust as needed
-    };
+  const signUp = async (email: string, password: string, metadata?: any) => {
+    try {
+      const requestBody = {
+        email,
+        password,
+        firstName: metadata?.firstName || null,
+        lastName: metadata?.lastName || null,
+        phone: metadata?.phone || null,
+        address: metadata?.address || null,
+        role: metadata?.role || 0
+      };
 
-    console.log('Attempting signup with:', { email, ...metadata }); // Debug log
+      console.log('Attempting signup with:', { email, ...metadata });
 
-    const response = await fetch(`${"https://localhost:44339/api/profiles"}`, { // Replace with your actual endpoint
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
+      const response = await fetch(`${API_BASE_URL}/profiles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
 
-    const data = await response.json();
-    console.log('Signup response:', { status: response.status, data }); // Debug log
+      const data = await response.json();
+      console.log('Signup response:', { status: response.status, data });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        toast({
+          title: "Signup Error",
+          description: data.message || data.error || 'Signup failed',
+          variant: "destructive",
+        });
+        return { error: data };
+      } else {
+        toast({
+          title: "Success!",
+          description: "Account created successfully!",
+        });
+        return { data, error: null };
+      }
+    } catch (error: any) {
+      console.error('Network/fetch error:', error);
       toast({
-        title: "Signup Error",
-        description: data.message || data.error || 'Signup failed',
+        title: "Network Error",
+        description: "Failed to connect to authentication service. Please try again.",
         variant: "destructive",
       });
-      return { error: data };
-    } else {
-      toast({
-        title: "Success!",
-        description: "Account created successfully!",
-      });
-      return { data, error: null };
+      return { error };
     }
-
-  } catch (error: any) {
-    console.error('Network/fetch error:', error);
-    toast({
-      title: "Network Error",
-      description: "Failed to connect to authentication service. Please try again.",
-      variant: "destructive",
-    });
-    return { error };
-  }
-};
+  };
 
   const signIn = async (email: string, password: string) => {
     try {
-     console.log('Attempting signin with:', email);
+      console.log('Attempting signin with:', email);
 
-      const response = await fetch(`${"https://localhost:44339/api/profiles/login"}`, {
+      const response = await fetch(`${API_BASE_URL}/profiles/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -250,11 +193,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ email, password })
       });
 
-
-
       const contentType = response.headers.get('content-type');
       let data;
-      
+
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
@@ -262,13 +203,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Non-JSON response received:', text.substring(0, 200));
         throw new Error('Server returned invalid response format. Check server logs.');
       }
-
-
-
-      // const data = await response.json();
-      console.log('Signin response:', { status: response.status, data });
-
-
+    console.log('Full signin response data:', JSON.stringify(data, null, 2));
+    console.log('Token:', data.token || data.Token);
+    console.log('Profiles:', data.Profiles || data.profiles);
+    console.log('ExpiresIn:', data.expiresIn || data.ExpiresIn);
+    console.log('Signin response:', { status: response.status, data });
+      
 
       if (!response.ok) {
         const errorMessage = data.message || data.error || 'Login failed';
@@ -280,15 +220,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: { message: errorMessage } };
       }
 
-      const { token, Profiles: userData, expiresIn } = data;
-      const expiresAt = Date.now() + (expiresIn || 3600) * 1000;
+const token = data.token || data.Token;
+const userData = data.profiles || data.Profiles;  // ← lowercase 'p' first!
+const expiresIn = data.expiresIn || data.ExpiresIn || 3600;     
 
+
+const expiresAt = Date.now() + (expiresIn || 3600) * 1000;//
 
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('tokenExpiresAt', expiresAt.toString());
+      localStorage.setItem('tokenExpiresAt', expiresIn.toString());
 
-       setUser(userData);
+      setUser(userData);
       setSession({
         user:userData,
         accessToken: token,
@@ -296,44 +239,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expiresAt,
       });
 
-  await fetchUserProfile(userData.Id);
+     fetchUserProfile(userData.id);
+  
 
-      toast({    
+      toast({
         title: "Welcome back!",
         description: `Logged in as ${userData.email}`,
       });
 
       return { error: null };
-
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: "Login Error",
+        title: "Login Error", 
         description: error.message || "An error occurred during login",
-        variant: "destructive", 
+        variant: "destructive",
       });
       return { error };
     }
+
+    
   };
 
-  
 
   const officerSignIn = async (name: string, badgeNumber: string) => {
     try {
-      // First, find the security officer by badge number
       console.log('Attempting officer signin with:', { name, badgeNumber });
 
-      const response = await fetch(`${API_BASE_URL}/auth/officer-login`, {
+      const response = await fetch(`${API_BASE_URL}/profiles/officer-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, badgeNumber })
+        body: JSON.stringify({ 
+        name,
+        badgeNumber })
       });
 
       const data = await response.json();
       console.log('Officer signin response:', { status: response.status, data });
-
 
       if (!response.ok) {
         const errorMessage = data.message || data.error || 'Invalid badge number or name';
@@ -344,10 +288,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         return { error: { message: errorMessage } };
       }
-    
-      const { token, user: userData, profile, expiresIn } = data;
-      const expiresAt = Date.now() + (expiresIn || 3600) * 1000;
 
+      const { token, user: userData, profiles, expiresIn } = data;
+      const expiresAt = Date.now() + (expiresIn || 3600) * 1000;
 
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -361,20 +304,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expiresAt,
       });
 
-      if (profile) {
-        setUserProfile(profile);
+      if (profiles) {
+        setUserProfile(profiles);
       } else {
         await fetchUserProfile(userData.id);
       }
+      
 
       toast({
         title: "Welcome!",
         description: `Logged in as Officer ${badgeNumber}`,
       });
 
-       return { error: null };
-
-} catch (error: any) {
+      return { error: null };
+    } catch (error: any) {
       console.error('Officer login error:', error);
       toast({
         title: "Login Error",
@@ -385,82 +328,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-      // // Get the officer's profile
-      // const { data: profile, error: profileError } = await supabase
-      //   .from('profiles')
-      //   .select('*')
-      //   .eq('id', officer.user_id)
-      //   .single();
-
-      // if (profileError || !profile) {
-      //   const error = new Error('Officer profile not found');
-      //   toast({
-      //     title: "Login Error",
-      //     description: "Officer profile not found",
-      //     variant: "destructive",
-      //   });
-      //   return { error };
-      // }
-
-      // Check if the name matches (case insensitive)
-  //     const officerName = `${profile.first_name} ${profile.last_name}`.toLowerCase();
-  //     const providedName = name.toLowerCase().trim();
-      
-  //     if (!officerName.includes(providedName) && !providedName.includes(profile.first_name.toLowerCase())) {
-  //       const error = new Error('Invalid name or badge number');
-  //       toast({
-  //         title: "Login Error",
-  //         description: "Invalid name or badge number",
-  //         variant: "destructive",
-  //       });
-  //       return { error };
-  //     }
-
-  //     // Create a temporary session for the officer
-  //     const officerUser = {
-  //       id: officer.user_id,
-  //       email: `officer_${officer.badge_number}@temp.com`,
-  //       user_metadata: {
-  //         first_name: profile.first_name,
-  //         last_name: profile.last_name,
-  //         badge_number: officer.badge_number,
-  //         role: 'security_officer'
-  //       }
-  //     };
-
-  //     // Set session manually for officer
-  //     setUser(officerUser as any);
-  //     setSession({
-  //       user: officerUser as any,
-  //       access_token: 'temp_officer_token',
-  //       refresh_token: 'temp_refresh_token',
-  //       expires_in: 3600,
-  //       expires_at: Date.now() + 3600000,
-  //       token_type: 'bearer'
-  //     } as any);
-
-  //     setUserProfile(profile);
-
-  //     toast({
-  //       title: "Welcome!",
-  //       description: `Logged in as ${profile.first_name} ${profile.last_name}`,
-  //     });
-
-  //     return { error: null };
-  //   } catch (error: any) {
-  //     toast({
-  //       title: "Login Error",
-  //       description: error.message,
-  //       variant: "destructive",
-  //     });
-  //     return { error };
-  //   }
-  // };
-
   const signOut = async () => {
     try {
-     const token = localStorage.getItem('authToken');    
-     
+      const token = localStorage.getItem('authToken');
+
       if (token) {
         try {
           await fetch(`${API_BASE_URL}/auth/logout`, {
@@ -472,7 +343,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         } catch (error) {
           console.error('Logout endpoint error:', error);
-          // Continue with local cleanup even if API call fails
         }
       }
 
@@ -481,10 +351,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('tokenExpiresAt');
       localStorage.removeItem('refreshToken');
 
-
       setUser(null);
       setSession(null);
       setUserProfile(null);
+      
       toast({
         title: "Signed out",
         description: "You have been successfully signed out.",
@@ -499,8 +369,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = {
-    user: Profiles,
-    Profiles,
+    user,
     session,
     userProfile,
     loading,

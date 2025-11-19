@@ -45,8 +45,8 @@ const UserSignupForm: React.FC<UserSignupFormProps> = ({ onBack, onLogin }) => {
       formData.email,
       formData.password,
       {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         phone: formData.phone,
         address: formData.address,
       }

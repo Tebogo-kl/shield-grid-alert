@@ -1,18 +1,17 @@
-
 import React, { useState } from 'react';
 import { ArrowLeft, Mail, Lock, Building, Phone, MapPin, User, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface CompanySignupFormProps {
   onBack: () => void;
   onLogin: () => void;
 }
+
+const API_BASE_URL = 'https://localhost:44339/api';
 
 const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }) => {
   const [formData, setFormData] = useState({
@@ -28,7 +27,6 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
   const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -50,59 +48,67 @@ const CompanySignupForm: React.FC<CompanySignupFormProps> = ({ onBack, onLogin }
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // First, create the user account
-      const { error: signUpError } = await signUp(
-        formData.email,
-        formData.password,
-        {
-          first_name: formData.contactPerson.split(' ')[0] || '',
-          last_name: formData.contactPerson.split(' ').slice(1).join(' ') || '',
-          phone: formData.phone,
-          address: formData.address,
-        }
-      );
+      console.log('Attempting company registration...');
 
-      if (signUpError) {
-        setLoading(false);
-        return;
-      }
-
-      // Then, create the company record
-      const { error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          company_name: formData.companyName,
-          registration_number: formData.registrationNumber,
+      // Call your .NET API endpoint for company registration
+      const response = await fetch(`${API_BASE_URL}/companies/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyName: formData.companyName,
+          registrationNumber: formData.registrationNumber,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
           description: formData.description,
-          contact_person: formData.contactPerson,
-          contact_title: formData.contactTitle,
-          owner_id: (await supabase.auth.getUser()).data.user?.id,
-        });
+          contactPerson: formData.contactPerson,
+          contactTitle: formData.contactTitle,
+          password: formData.password,
+        }),
+      });
 
-      if (companyError) {
-        console.error('Company creation error:', companyError);
+      const data = await response.json();
+      console.log('Company registration response:', { status: response.status, data });
+
+      if (!response.ok) {
         toast({
-          title: "Company Registration Error",
-          description: "Failed to register company. Please try again.",
+          title: "Registration Error",
+          description: data.message || data.error || 'Failed to register company',
           variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Success!",
-          description: "Company registration successful. Please check your email to verify your account.",
-        });
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Registration error:', error);
+
       toast({
-        title: "Registration Error",
-        description: "An error occurred during registration.",
+        title: "Success!",
+        description: "Company registered successfully! You can now sign in.",
+      });
+
+      // Redirect to login after successful registration
+      setTimeout(() => {
+        onLogin();
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Company registration error:', error);
+      toast({
+        title: "Network Error",
+        description: error.message || "Failed to connect to the server. Please try again.",
         variant: "destructive",
       });
     }

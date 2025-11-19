@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Building, Users, Plus, MapPin, Phone, Mail, Shield, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AddOfficerForm from '@/components/company/AddOfficerForm';
+
+const API_BASE_URL = 'https://localhost:44339/api';
 
 interface Officer {
   id: string;
@@ -21,118 +21,77 @@ interface Officer {
   joinDate: string;
 }
 
+interface Company {
+  id: string;
+  ownerId:string;
+  companyName: string;
+  email: string;
+  phone: string;
+}
+
 const CompanyDashboard = () => {
   const [showAddOfficer, setShowAddOfficer] = useState(false);
   const [officers, setOfficers] = useState<Officer[]>([]);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user && userProfile) {
-      fetchOfficers();
+    if (user) {
+      fetchCompanyAndOfficers();
     }
-  }, [user, userProfile]);
+  }, [user]);
 
-  const fetchOfficers = async () => {
+  const fetchCompanyAndOfficers = async () => {
     if (!user) {
-      console.log('No user found');
       setLoading(false);
       return;
     }
 
     try {
-      console.log('Fetching officers for user:', user.id);
+      const token = localStorage.getItem('authToken');
       
-      // Get company ID first
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single();
-
-      if (companyError || !companyData) {
-        console.error('Company not found:', companyError);
-        // If no company found, this might be a new company owner
-        setOfficers([]);
-        setLoading(false);
-        return;
-      }
-
-      console.log('Found company:', companyData.id);
-
-      // Get officers for this company
-      const { data: officersData, error: officersError } = await supabase
-        .from('security_officers')
-        .select('id, badge_number, status, created_at, user_id')
-        .eq('company_id', companyData.id);
-
-      if (officersError) {
-        console.error('Error fetching officers:', officersError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch officers. Please try again.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (!officersData || officersData.length === 0) {
-        console.log('No officers found for company');
-        setOfficers([]);
-        setLoading(false);
-        return;
-      }
-
-      // Get profiles for these officers
-      const userIds = officersData.map(officer => officer.user_id);
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, phone')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch officer profiles.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Combine the data
-      const formattedOfficers = officersData.map(officer => {
-        const profile = profilesData?.find(p => p.id === officer.user_id);
-        
-        // Map database status to interface status
-        let status: 'active' | 'off-duty' | 'on-patrol' = 'off-duty';
-        if (officer.status === 'available') status = 'active';
-        else if (officer.status === 'busy') status = 'on-patrol';
-        else status = 'off-duty';
-
-        return {
-          id: officer.id,
-          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',
-          badge: officer.badge_number,
-          phone: profile?.phone || 'N/A',
-          email: 'N/A', // We don't store email in profiles currently
-          status,
-          location: 'Unknown',
-          certification: 'General Security',
-          joinDate: new Date(officer.created_at).toLocaleDateString()
-        };
+      // First, get the company owned by this user
+      const companiesResponse = await fetch(`${API_BASE_URL}/companies`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      console.log('Formatted officers:', formattedOfficers);
-      setOfficers(formattedOfficers);
+      if (!companiesResponse.ok) {
+        throw new Error('Failed to fetch companies');
+      }
+
+      const companies = await companiesResponse.json();
+      
+      console.log('Companies fetched:', companies);
+      console.log('Current user ID:', user.id);
+      
+      // Find the company owned by the current user (handle both camelCase and PascalCase)
+      const userCompany = companies.find((c: any) => 
+        c.ownerId === user.id || c.OwnerId === user.id      );
+      
+      if (!userCompany) {
+        console.log('No company found for user');
+        console.log('Available companies:', companies.map((c: any) => ({ id: c.id, ownerId: c.ownerId || c.OwnerId })));
+        setOfficers([]);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Found company:', userCompany);
+
+      setCompany(userCompany);
+
+      // Fetch officers for this company
+      await fetchOfficers(userCompany.id, token);
     } catch (error) {
-      console.error('Error fetching officers:', error);
+      console.error('Error fetching company data:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred while fetching officers.",
+        description: "Failed to fetch company information. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -140,157 +99,161 @@ const CompanyDashboard = () => {
     }
   };
 
-  const handleAddOfficer = async (newOfficerData: Omit<Officer, 'id'>) => {
-    if (!user) {
+  const fetchOfficers = async (companyId: string, token: string | null) => {
+    try {
+      // Fetch security officers for this company
+      const officersResponse = await fetch(`${API_BASE_URL}/securityofficers/company/${companyId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!officersResponse.ok) {
+        if (officersResponse.status === 404) {
+          // No officers found
+          setOfficers([]);
+          return;
+        }
+        throw new Error('Failed to fetch officers');
+      }
+
+      const officersData = await officersResponse.json();
+
+      // Format officers data
+      const formattedOfficers: Officer[] = officersData.map((officer: any) => {
+        // Map API status to UI status
+        let status: 'active' | 'off-duty' | 'on-patrol' = 'off-duty';
+        if (officer.status === 'available') status = 'active';
+        else if (officer.status === 'busy') status = 'on-patrol';
+        else status = 'off-duty';
+
+        return {
+          id: officer.id,
+          name: `${officer.firstName || ''} ${officer.lastName || ''}`.trim() || 'Unknown',
+          badge: officer.badgeNumber || 'N/A',
+          phone: officer.phone || 'N/A',
+          email: officer.email || 'N/A',
+          status,
+          location: 'Unknown',
+          certification: officer.specializations?.join(', ') || 'General Security',
+          joinDate: new Date(officer.createdAt).toLocaleDateString()
+        };
+      });
+
+      setOfficers(formattedOfficers);
+    } catch (error) {
+      console.error('Error fetching officers:', error);
       toast({
         title: "Error",
-        description: "You must be logged in to add officers.",
+        description: "Failed to fetch officers. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddOfficer = async (newOfficerData: Omit<Officer, 'id'>) => {
+    if (!user || !company) {
+      toast({
+        title: "Error",
+        description: "Company information not found.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      console.log('Starting officer creation process...');
+      const token = localStorage.getItem('authToken');
       
-      // Get or create company
-      let companyData;
-      const { data: existingCompany, error: companyError } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single();
-
-      if (companyError && companyError.code !== 'PGRST116') {
-        console.error('Error checking for company:', companyError);
-        toast({
-          title: "Error",
-          description: "Failed to verify company information.",
-          variant: "destructive",
-        });
-        return;
+    if (!token) { // Add a check for a missing token
+          throw new Error("Missing authentication token. Please log in again.");
       }
 
-      if (!existingCompany) {
-        // Create a default company for this user
-        const { data: newCompany, error: createCompanyError } = await supabase
-          .from('companies')
-          .insert({
-            company_name: `${userProfile?.first_name || 'User'}'s Security Company`,
-            registration_number: `REG-${Date.now()}`,
-            email: user.email || 'company@example.com',
-            phone: newOfficerData.phone || '+27 11 123 4567',
-            address: 'Default Address',
-            contact_person: `${userProfile?.first_name || 'User'} ${userProfile?.last_name || ''}`,
-            contact_title: 'Owner',
-            owner_id: user.id
-          })
-          .select()
-          .single();
-
-        if (createCompanyError) {
-          console.error('Error creating company:', createCompanyError);
-          toast({
-            title: "Error",
-            description: "Failed to create company. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        companyData = newCompany;
-        console.log('Created new company:', companyData);
-      } else {
-        companyData = existingCompany;
-        console.log('Using existing company:', companyData);
-      }
-
-      // Generate a proper UUID for the profile using crypto.randomUUID()
-      const profileId = crypto.randomUUID();
-      
-      console.log('Generated profile ID:', profileId);
-
-      // Create profile first
+      // Split name
       const [firstName, ...lastNameParts] = newOfficerData.name.split(' ');
       const lastName = lastNameParts.join(' ');
 
-      console.log('Creating profile...', { firstName, lastName, phone: newOfficerData.phone });
+      // Map UI status to API status
+      let apiStatus = 'offline';
+      if (newOfficerData.status === 'active') apiStatus = 'available';
+      else if (newOfficerData.status === 'on-patrol') apiStatus = 'busy';
 
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: profileId,
-          first_name: firstName,
-          last_name: lastName || '',
+      // Create officer
+      const response = await fetch(`${API_BASE_URL}/securityofficers`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId: company.id,
+          badgeNumber: newOfficerData.badge,
+          firstName: firstName,
+          lastName: lastName || '',
           phone: newOfficerData.phone,
-          role: 'security_officer'
-        })
-        .select()
-        .single();
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-        toast({
-          title: "Profile Creation Failed",
-          description: `Failed to create officer profile: ${profileError.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('Profile created successfully:', profileData);
-
-      // Map the form status to database status
-      let dbStatus: 'available' | 'busy' | 'offline' = 'offline';
-      if (newOfficerData.status === 'active') dbStatus = 'available';
-      else if (newOfficerData.status === 'on-patrol') dbStatus = 'busy';
-
-      console.log('Creating security officer...', {
-        user_id: profileData.id,
-        company_id: companyData.id,
-        badge_number: newOfficerData.badge,
-        status: dbStatus
+          email: newOfficerData.email,
+          status: apiStatus,
+          specializations: [newOfficerData.certification]
+        }),
       });
 
-      // Create security officer
-      const { error: officerError } = await supabase
-        .from('security_officers')
-        .insert({
-          user_id: profileData.id,
-          company_id: companyData.id,
-          badge_number: newOfficerData.badge,
-          status: dbStatus,
-          specializations: [newOfficerData.certification]
-        });
-
-      if (officerError) {
-        console.error('Error creating officer:', officerError);
-        toast({
-          title: "Officer Creation Failed",
-          description: `Failed to create security officer: ${officerError.message}`,
-          variant: "destructive",
-        });
-        
-        // Clean up the profile if officer creation failed
-        await supabase.from('profiles').delete().eq('id', profileData.id);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add officer');
       }
-
-      console.log('Officer created successfully');
 
       toast({
         title: "Success!",
         description: `Officer ${newOfficerData.name} has been added successfully.`,
       });
 
-      // Refresh the officers list
-      await fetchOfficers();
+      // Refresh officers list
+      await fetchOfficers(company.id, token);
       setShowAddOfficer(false);
-    } catch (error) {
-      console.error('Unexpected error adding officer:', error);
+    } catch (error: any) {
+      console.error('Error adding officer:', error);
       toast({
-        title: "Unexpected Error",
-        description: "An unexpected error occurred while adding the officer. Please try again.",
+        title: "Error",
+        description: error.message || "Failed to add officer. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteOfficer = async (officerId: string) => {
+    if (!window.confirm('Are you sure you want to delete this officer?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch(`${API_BASE_URL}/securityofficers/${officerId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete officer');
+      }
+
+      toast({
+        title: "Success!",
+        description: "Officer deleted successfully.",
+      });
+
+      // Refresh officers list
+      if (company) {
+        await fetchOfficers(company.id, token);
+      }
+    } catch (error) {
+      console.error('Error deleting officer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete officer. Please try again.",
         variant: "destructive",
       });
     }
@@ -327,7 +290,7 @@ const CompanyDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold text-white">Company Dashboard</h1>
               <p className="text-white/70">
-                {userProfile?.first_name ? `${userProfile.first_name}'s Security Company` : 'Security Company'}
+                {company?.companyName || `${userProfile?.firstName || 'Your'} Security Company`}
               </p>
             </div>
           </div>
@@ -449,7 +412,12 @@ const CompanyDashboard = () => {
                         <Button size="sm" variant="outline" className="border-white/20 text-white/70">
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button size="sm" variant="outline" className="border-red-500/50 text-red-400 hover:bg-red-500/10">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                          onClick={() => handleDeleteOfficer(officer.id)}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, MapPin, Clock, Users, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,8 +22,19 @@ const Index = () => {
   const [selectedService, setSelectedService] = useState('');
   const [userLocation, setUserLocation] = useState({ lat: -26.2041, lng: 28.0473 });
   const [locationName, setLocationName] = useState('Johannesburg, South Africa');
-  const { user, userProfile, signOut } = useAuth();
+  const { user, userProfile, signOut, loading } = useAuth();
   const navigate = useNavigate();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('=== Auth State Debug ===');
+    console.log('Loading:', loading);
+    console.log('User:', user);
+    console.log('UserProfile:', userProfile);
+    console.log('Token:', localStorage.getItem('authToken'));
+    console.log('Stored User:', localStorage.getItem('user'));
+    console.log('=====================');
+  }, [user, userProfile, loading]);
 
   useEffect(() => {
     // Get user's location
@@ -35,7 +45,6 @@ const Index = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           });
-          // In a real app, you'd reverse geocode this to get the location name
         },
         (error) => {
           console.log('Location access denied, using default location');
@@ -49,13 +58,53 @@ const Index = () => {
   };
 
   const handleDashboardNavigation = () => {
-    if (userProfile?.role === 'company_admin') {
+    if (userProfile?.role === 'CompanyAdmin') {
       navigate('/company-dashboard');
-    } else if (userProfile?.role === 'security_officer') {
+    } else if (userProfile?.role === 'SecurityOfficer') {
       navigate('/officer-dashboard');
     } else {
       // Regular user stays on this page
     }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // Get user initials for avatar fallback
+  const getUserInitials = () => {
+    if (userProfile?.firstName && userProfile?.lastName) {
+      return `${userProfile.firstName[0]}${userProfile.lastName[0]}`.toUpperCase();
+    }
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase();
+    }
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email[0].toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (userProfile?.firstName && userProfile?.lastName) {
+      return `${userProfile.firstName} ${userProfile.lastName}`;
+    }
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name} ${userProfile.last_name}`;
+    }
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    return user?.email || 'User';
   };
 
   return (
@@ -75,31 +124,36 @@ const Index = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-white/10">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={userProfile?.avatar_url} alt={`${userProfile?.first_name || 'User'}`} />
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {userProfile?.first_name?.[0]?.toUpperCase() || userProfile?.last_name?.[0]?.toUpperCase() || 'U'}
+                      <AvatarImage 
+                        src={userProfile?.avatarUrl || userProfile?.avatar_url} 
+                        alt={getUserDisplayName()} 
+                      />
+                      <AvatarFallback className="bg-blue-600 text-white">
+                        {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56 bg-card" align="end" forceMount>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        {userProfile?.first_name} {userProfile?.last_name}
+                        {getUserDisplayName()}
                       </p>
                       <p className="text-xs leading-none text-muted-foreground">
                         {user.email}
                       </p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {userProfile?.role?.replace('_', ' ') || 'User'}
-                      </p>
+                      {userProfile?.role && (
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {userProfile.role.toString().replace('_', ' ')}
+                        </p>
+                      )}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {userProfile?.role !== 'user' && (
+                  {userProfile?.role !== 0 && userProfile?.role !== 'user' && (
                     <>
                       <DropdownMenuItem onClick={handleDashboardNavigation} className="cursor-pointer">
                         Dashboard
@@ -117,7 +171,7 @@ const Index = () => {
                     View Profile Info
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive">
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-red-500">
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -148,7 +202,7 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Service Selection */}
           <div className="lg:col-span-1 space-y-6">
-            <ServiceSelector onServiceSelect={handleServiceSelect} selectedService={''} />
+            <ServiceSelector onServiceSelect={handleServiceSelect} selectedService={selectedService} />
             
             {/* Emergency Button */}
             <Card className="bg-red-600/20 border-red-500/50">

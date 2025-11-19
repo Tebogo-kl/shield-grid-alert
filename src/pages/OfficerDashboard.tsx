@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, MapPin, Clock, CheckCircle, XCircle, Phone, User } from 'lucide-react';
+import { Shield, MapPin, Clock, CheckCircle, Phone, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+
+const API_BASE_URL = 'https://localhost:44339/api';
 
 interface ServiceRequest {
   id: string;
@@ -18,83 +20,116 @@ interface ServiceRequest {
   status: string;
   created_at: string;
   user_profile?: {
-    first_name: string;
-    last_name: string;
+    firstName: string;
+    lastName: string;
     phone: string;
   };
 }
-
 const OfficerDashboard = () => {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [officerStatus, setOfficerStatus] = useState<'available' | 'busy' | 'offline'>('offline');
+  const [officerId, setOfficerId] = useState<string | null>(null);
+  const [badgeNumber, setBadgeNumber] = useState<string>('');
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
-    fetchRequests();
-    fetchOfficerStatus();
+    if (user) {
+      fetchOfficerData();
+      fetchRequests();
+      
+      // Poll for new requests every 10 seconds
+      const interval = setInterval(() => {
+        fetchRequests();
+      }, 10000);
 
-    // Set up real-time subscription for new requests
-    const channel = supabase
-      .channel('service-requests-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'service_requests'
-        },
-        () => {
-          console.log('New service request received');
-          fetchRequests();
-        }
-      )
-      .subscribe();
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  useEffect(() => {
+  if (user && user.id) {
+    setOfficerId(user.id);
+  }
+}, [user]);
 
+ const fetchOfficerData = async () => {
+  try {
+    const token = localStorage.getItem('authToken');
+    
+    console.log('Fetching officer data for user:', user?.id);
+    
+    // Get officer information by user ID
+    const response = await fetch(`${API_BASE_URL}/securityofficers/user/${user?.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('Officer fetch response:', response.status);
+
+    if (response.ok) {
+      const officerData = await response.json();
+      console.log('Officer data:', officerData);
+      
+      setOfficerId(officerData.id);
+      setBadgeNumber(officerData.badgeNumber);
+      
+      // Map API status to UI status
+      const statusLower = officerData.status.toLowerCase();
+      if (statusLower === 'available') setOfficerStatus('available');
+      else if (statusLower === 'busy') setOfficerStatus('busy');
+      else setOfficerStatus('offline');
+    } else {
+      console.error('Failed to fetch officer data:', response.status);
+    }
+  } catch (error) {
+    console.error('Error fetching officer data:', error);
+  }
+};
   const fetchRequests = async () => {
     try {
+      const token = localStorage.getItem('authToken');
+      
       // Get pending service requests
-      const { data: serviceRequests, error: requestsError } = await supabase
-        .from('service_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      const response = await fetch(`${API_BASE_URL}/servicerequests/pending`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (requestsError) throw requestsError;
-
-      if (!serviceRequests || serviceRequests.length === 0) {
-        setRequests([]);
-        return;
+      if (!response.ok) {
+        if (response.status === 404) {
+          setRequests([]);
+          return;
+        }
+        throw new Error('Failed to fetch requests');
       }
 
-      // Get user profiles for each request
-      const userIds = serviceRequests.map(req => req.user_id);
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, phone')
-        .in('id', userIds);
+      const data = await response.json();
+      
+      // Format the data to match UI expectations
+      const formattedRequests = data.map((req: any) => ({
+        id: req.id,
+        userId: req.userId,
+        serviceType: req.serviceType,
+        description: req.description,
+        locationAddress: req.locationAddress,
+        locationLatitude: req.locationLatitude,
+        locationLongitude: req.locationLongitude,
+        status: req.status,
+        createdAt: req.createdAt,
+        userProfile: req.userProfile ? {
+          firstName: req.userProfile.firstName,
+          lastName: req.userProfile.lastName,
+          phone: req.userProfile.phone
+        } : undefined
+      }));
 
-      if (profilesError) throw profilesError;
-
-      // Combine the data
-      const requestsWithProfiles = serviceRequests.map(request => {
-        const profile = profiles?.find(p => p.id === request.user_id);
-        return {
-          ...request,
-          user_profile: profile ? {
-            first_name: profile.first_name,
-            last_name: profile.last_name,
-            phone: profile.phone || 'N/A'
-          } : undefined
-        };
-      }).filter(request => request.user_profile) as ServiceRequest[];
-
-      setRequests(requestsWithProfiles);
+      setRequests(formattedRequests);
     } catch (error) {
       console.error('Error fetching requests:', error);
     } finally {
@@ -102,68 +137,96 @@ const OfficerDashboard = () => {
     }
   };
 
-  const fetchOfficerStatus = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('security_officers')
-        .select('status')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (error) throw error;
-      setOfficerStatus(data?.status || 'offline');
-    } catch (error) {
-      console.error('Error fetching officer status:', error);
-    }
-  };
-
   const updateStatus = async (newStatus: 'available' | 'busy' | 'offline') => {
     try {
-      const { error } = await supabase
-        .from('security_officers')
-        .update({ status: newStatus })
-        .eq('user_id', user?.id);
+      const token = localStorage.getItem('authToken');
+      
+      // Map UI status to API status
+      let apiStatus = 'offline';
+      if (newStatus === 'available') apiStatus = 'available';
+      else if (newStatus === 'busy') apiStatus = 'busy';
 
-      if (error) throw error;
+      const response = await fetch(`${API_BASE_URL}/securityofficers/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: apiStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
       setOfficerStatus(newStatus);
 
-      // Update location when going available (optional enhancement)
+      toast({
+        title: "Status Updated",
+        description: `Your status is now ${newStatus}`,
+      });
+
+      // Update location when going available
       if (newStatus === 'available' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (position) => {
-          await supabase
-            .from('security_officers')
-            .update({ 
-              current_latitude: position.coords.latitude,
-              current_longitude: position.coords.longitude
-            })
-            .eq('user_id', user?.id);
+          await fetch(`${API_BASE_URL}/securityofficers/${officerId}/location`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            }),
+          });
         });
       }
     } catch (error) {
       console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   const acceptRequest = async (requestId: string) => {
     try {
-      // Update request status and assign officer
-      const { error: requestError } = await supabase
-        .from('service_requests')
-        .update({ 
-          status: 'accepted',
-          officer_id: user?.id
-        })
-        .eq('id', requestId);
+      const token = localStorage.getItem('authToken');
+      
+      // Accept the request
+      const response = await fetch(`${API_BASE_URL}/servicerequests/${requestId}/accept`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ officerId }),
+      });
 
-      if (requestError) throw requestError;
+      if (!response.ok) {
+        throw new Error('Failed to accept request');
+      }
+
+      toast({
+        title: "Request Accepted",
+        description: "You have successfully accepted the service request.",
+      });
 
       // Update officer status to busy
       await updateStatus('busy');
 
       // Refresh requests
-      fetchRequests();
+      await fetchRequests();
     } catch (error) {
       console.error('Error accepting request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to accept request. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -197,8 +260,9 @@ const OfficerDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold text-white">Officer Dashboard</h1>
               <p className="text-white/70">
-                Welcome, {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                  Welcome, {user?.firstName} {user?.lastName}
               </p>
+              <p className="text-2xl font-bold text-white">{badgeNumber}</p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -257,7 +321,8 @@ const OfficerDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-white/70 text-sm">Badge</p>
-                  <p className="text-2xl font-bold text-white">{user?.user_metadata?.badge_number}</p>
+                  <p className="text-2xl font-bold text-white">{user?.user_metadata?.badgeNumber}</p>
+                  <p className="text-2xl font-bold text-white">{badgeNumber || 'N/A'}</p>
                 </div>
                 <User className="h-8 w-8 text-green-400" />
               </div>
@@ -297,7 +362,7 @@ const OfficerDashboard = () => {
                           {request.user_profile && (
                             <div className="flex items-center space-x-2 text-white">
                               <User className="h-4 w-4" />
-                              <span>{request.user_profile.first_name} {request.user_profile.last_name}</span>
+                              <span>{request.user_profile.firstName} {request.user_profile.lastName}</span>
                               <Phone className="h-4 w-4 ml-4" />
                               <span>{request.user_profile.phone}</span>
                             </div>
