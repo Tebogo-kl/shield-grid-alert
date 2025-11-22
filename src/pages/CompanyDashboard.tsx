@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Plus, MapPin, Phone, Mail, Shield, Edit, Trash2 } from 'lucide-react';
+import { Building, Users, Plus, MapPin, Phone, Mail, Shield, Edit, Trash2, ChevronDown, ChevronUp, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AddOfficerForm from '@/components/company/AddOfficerForm';
@@ -34,6 +37,10 @@ const CompanyDashboard = () => {
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const [companyPsiraOpen, setCompanyPsiraOpen] = useState(false);
+  const [companyPsiraNumber, setCompanyPsiraNumber] = useState('');
+  const [companyVerified, setCompanyVerified] = useState(false);
+  const [officerVerifications, setOfficerVerifications] = useState<Record<string, { open: boolean; psira: string; verified: boolean }>>({});
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
@@ -259,6 +266,53 @@ const CompanyDashboard = () => {
     }
   };
 
+  const handleVerifyCompany = () => {
+    if (!companyPsiraNumber.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a PSIRA number",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCompanyVerified(true);
+    toast({
+      title: "Success!",
+      description: "Company PSIRA number verified successfully.",
+    });
+  };
+
+  const handleVerifyOfficer = (officerId: string) => {
+    const verification = officerVerifications[officerId];
+    if (!verification?.psira.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a PSIRA number",
+        variant: "destructive",
+      });
+      return;
+    }
+    setOfficerVerifications({
+      ...officerVerifications,
+      [officerId]: { ...verification, verified: true }
+    });
+    toast({
+      title: "Success!",
+      description: "Officer PSIRA number verified successfully.",
+    });
+  };
+
+  const toggleOfficerVerification = (officerId: string) => {
+    setOfficerVerifications({
+      ...officerVerifications,
+      [officerId]: {
+        open: !officerVerifications[officerId]?.open,
+        psira: officerVerifications[officerId]?.psira || '',
+        verified: officerVerifications[officerId]?.verified || false
+      }
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500/20 text-green-400';
@@ -360,6 +414,52 @@ const CompanyDashboard = () => {
           </Card>
         </div>
 
+        {/* Company PSIRA Compliance */}
+        <Card className="bg-white/10 border-white/20 mb-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center justify-between">
+              <span>Company PSIRA Compliance</span>
+              <Badge className={companyVerified ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                {companyVerified ? (
+                  <><CheckCircle2 className="h-3 w-3 mr-1" /> Verified</>
+                ) : (
+                  <><XCircle className="h-3 w-3 mr-1" /> Not Verified</>
+                )}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Collapsible open={companyPsiraOpen} onOpenChange={setCompanyPsiraOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" className="w-full justify-between border-white/20 text-white/70 hover:bg-white/5">
+                  Verify Company PSIRA Number
+                  {companyPsiraOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="company-psira" className="text-white/70">PSIRA Number</Label>
+                    <Input
+                      id="company-psira"
+                      value={companyPsiraNumber}
+                      onChange={(e) => setCompanyPsiraNumber(e.target.value)}
+                      placeholder="Enter company PSIRA number"
+                      className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleVerifyCompany}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Verify
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </CardContent>
+        </Card>
+
         {/* Officers List */}
         <Card className="bg-white/10 border-white/20">
           <CardHeader>
@@ -372,58 +472,101 @@ const CompanyDashboard = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {officers.map((officer) => (
-                  <div key={officer.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
-                          <Shield className="h-6 w-6 text-blue-400" />
+                {officers.map((officer) => {
+                  const verification = officerVerifications[officer.id] || { open: false, psira: '', verified: false };
+                  return (
+                    <div key={officer.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
+                            <Shield className="h-6 w-6 text-blue-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h3 className="font-semibold text-white">{officer.name}</h3>
+                              <Badge variant="outline" className="text-xs">
+                                {officer.badge}
+                              </Badge>
+                              <Badge className={getStatusColor(officer.status)}>
+                                {officer.status}
+                              </Badge>
+                              <Badge className={verification.verified ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                                {verification.verified ? (
+                                  <><CheckCircle2 className="h-3 w-3 mr-1" /> Verified</>
+                                ) : (
+                                  <><XCircle className="h-3 w-3 mr-1" /> Not Verified</>
+                                )}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center space-x-4 mt-1 text-sm text-white/70">
+                              <div className="flex items-center space-x-1">
+                                <Phone className="h-3 w-3" />
+                                <span>{officer.phone}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Mail className="h-3 w-3" />
+                                <span>{officer.email}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <MapPin className="h-3 w-3" />
+                                <span>{officer.location}</span>
+                              </div>
+                            </div>
+                            <div className="text-xs text-white/50 mt-1">
+                              {officer.certification} • Joined {officer.joinDate}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h3 className="font-semibold text-white">{officer.name}</h3>
-                            <Badge variant="outline" className="text-xs">
-                              {officer.badge}
-                            </Badge>
-                            <Badge className={getStatusColor(officer.status)}>
-                              {officer.status}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center space-x-4 mt-1 text-sm text-white/70">
-                            <div className="flex items-center space-x-1">
-                              <Phone className="h-3 w-3" />
-                              <span>{officer.phone}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Mail className="h-3 w-3" />
-                              <span>{officer.email}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="h-3 w-3" />
-                              <span>{officer.location}</span>
-                            </div>
-                          </div>
-                          <div className="text-xs text-white/50 mt-1">
-                            {officer.certification} • Joined {officer.joinDate}
-                          </div>
+                        <div className="flex space-x-2">
+                          <Button size="sm" variant="outline" className="border-white/20 text-white/70">
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                            onClick={() => handleDeleteOfficer(officer.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <Button size="sm" variant="outline" className="border-white/20 text-white/70">
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="border-red-500/50 text-red-400 hover:bg-red-500/10"
-                          onClick={() => handleDeleteOfficer(officer.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      
+                      <Collapsible open={verification.open} onOpenChange={() => toggleOfficerVerification(officer.id)}>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="outline" size="sm" className="w-full justify-between border-white/20 text-white/70 hover:bg-white/5">
+                            Verify Officer PSIRA Number
+                            {verification.open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-4">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor={`officer-psira-${officer.id}`} className="text-white/70">PSIRA Number</Label>
+                              <Input
+                                id={`officer-psira-${officer.id}`}
+                                value={verification.psira}
+                                onChange={(e) => setOfficerVerifications({
+                                  ...officerVerifications,
+                                  [officer.id]: { ...verification, psira: e.target.value }
+                                })}
+                                placeholder="Enter officer PSIRA number"
+                                className="bg-white/5 border-white/20 text-white placeholder:text-white/50"
+                              />
+                            </div>
+                            <Button 
+                              onClick={() => handleVerifyOfficer(officer.id)}
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700"
+                            >
+                              Verify
+                            </Button>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
