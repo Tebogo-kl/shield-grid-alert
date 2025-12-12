@@ -9,6 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AddOfficerForm from '@/components/company/AddOfficerForm';
+import CRMSidebar from '@/components/crm/CRMSidebar';
+import CRMOverview from '@/components/crm/CRMOverview';
+import CRMOfficers from '@/components/crm/CRMOfficers';
+import CRMClients from '@/components/crm/CRMClients';
+import CRMJobs from '@/components/crm/CRMJobs';
+import CRMCompliance from '@/components/crm/CRMCompliance';
 
 const API_BASE_URL = 'https://localhost:44339/api';
 
@@ -41,6 +47,7 @@ interface Company {
 }
 
 const CompanyDashboard = () => {
+  const [activeTab, setActiveTab] = useState('overview');
   const [showAddOfficer, setShowAddOfficer] = useState(false);
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
@@ -85,9 +92,7 @@ const CompanyDashboard = () => {
         },
       });
 
-      if (!companiesResponse.ok) {
-        throw new Error('Failed to fetch companies');
-      }
+      if (!companiesResponse.ok) throw new Error('Failed to fetch companies');
 
       const companies = await companiesResponse.json();
       
@@ -105,11 +110,7 @@ const CompanyDashboard = () => {
       await fetchOfficers(userCompany.id, token);
     } catch (error) {
       console.error('Error fetching company data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch company information. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to fetch company information.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -118,10 +119,7 @@ const CompanyDashboard = () => {
   const fetchOfficers = async (companyId: string, token: string | null) => {
     try {
       const officersResponse = await fetch(`${API_BASE_URL}/securityofficers/company/${companyId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
 
       if (!officersResponse.ok) {
@@ -138,7 +136,6 @@ const CompanyDashboard = () => {
         let status: 'active' | 'off-duty' | 'on-patrol' = 'off-duty';
         if (officer.status === 'available') status = 'active';
         else if (officer.status === 'busy') status = 'on-patrol';
-        else status = 'off-duty';
 
         return {
           id: officer.id,
@@ -160,30 +157,15 @@ const CompanyDashboard = () => {
       setOfficers(formattedOfficers);
     } catch (error) {
       console.error('Error fetching officers:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch officers. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
   const handleAddOfficer = async (newOfficerData: Omit<Officer, 'id'>) => {
-    if (!user || !company) {
-      toast({
-        title: "Error",
-        description: "Company information not found.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!user || !company) return;
 
     try {
       const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        throw new Error("Missing authentication token. Please log in again.");
-      }
+      if (!token) throw new Error("Missing authentication token.");
 
       const [firstName, ...lastNameParts] = newOfficerData.name.split(' ');
       const lastName = lastNameParts.join(' ');
@@ -194,15 +176,11 @@ const CompanyDashboard = () => {
 
       const response = await fetch(`${API_BASE_URL}/securityofficers`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: company.id,
           badgeNumber: newOfficerData.badge,
-          firstName: firstName,
-          lastName: lastName || '',
+          firstName, lastName: lastName || '',
           phone: newOfficerData.phone,
           email: newOfficerData.email,
           status: apiStatus,
@@ -210,10 +188,7 @@ const CompanyDashboard = () => {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to add officer');
-      }
+      if (!response.ok) throw new Error('Failed to add officer');
 
       toast({
         title: "Success!",
@@ -223,29 +198,18 @@ const CompanyDashboard = () => {
       await fetchOfficers(company.id, token);
       setShowAddOfficer(false);
     } catch (error: any) {
-      console.error('Error adding officer:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add officer. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to add officer.", variant: "destructive" });
     }
   };
 
   const handleDeleteOfficer = async (officerId: string) => {
-    if (!window.confirm('Are you sure you want to delete this officer?')) {
-      return;
-    }
+    if (!window.confirm('Are you sure you want to delete this officer?')) return;
 
     try {
       const token = localStorage.getItem('authToken');
-      
       const response = await fetch(`${API_BASE_URL}/securityofficers/${officerId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
 
       if (!response.ok) {
@@ -261,12 +225,7 @@ const CompanyDashboard = () => {
         await fetchOfficers(company.id, localStorage.getItem('authToken'));
       }
     } catch (error) {
-      console.error('Error deleting officer:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete officer. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete officer.", variant: "destructive" });
     }
   };
 
@@ -355,7 +314,7 @@ const CompanyDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-white">Loading...</div>
       </div>
     );
