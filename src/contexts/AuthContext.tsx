@@ -17,6 +17,24 @@ interface User {
   };
 }
 
+interface SecurityOfficer {
+  id: string;
+  userId?: string;
+  companyId?: string;
+  badgeNumber?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  status?: string;
+  specializations?: string[];
+  isPsiraVerified?: boolean;
+  psiraCertificateExpiry?: string; 
+  psiraNumber?: string;
+  psiraStatus?: string;
+  createdAt?: string;
+}
+
 interface Session {
   user: User;
   accessToken: string;
@@ -27,6 +45,7 @@ interface Session {
 
 interface AuthContextType {
   user: User | null;
+  securityOfficer: SecurityOfficer | null;
   session: Session | null;
   loading: boolean;
   userProfile: any;
@@ -53,6 +72,8 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [securityOfficer, setSecurityOfficer] = useState<SecurityOfficer | null>(null);
+  const [securityOfficerSession, setSecurityOfficerSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -82,6 +103,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const fetchSecurityOfficer = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/securityofficers/user/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        console.log('No security officer found for this user');
+        setSecurityOfficer(null);
+        return null;
+      }
+
+      const officer = await response.json();
+      console.log('Fetched security officer:', officer);
+      setSecurityOfficer(officer);
+      localStorage.setItem('securityOfficer', JSON.stringify(officer));
+      return officer;
+
+    } catch (error) {
+      console.error('Error fetching security officer:', error);
+      return null;
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await fetchUserProfile(user.id);
@@ -89,10 +138,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener
     const checkAuth = async () => {
       const token = localStorage.getItem('authToken');
       const userStr = localStorage.getItem('user');
+      const officerStr = localStorage.getItem('securityOfficer');
+      const officerToken = localStorage.getItem('securityOfficerToken');
+      const officerExpiresAt = localStorage.getItem('securityOfficerTokenExpiresAt');
+
+      // Restore security officer from localStorage
+      if (officerStr) {
+        try {
+          const officerData = JSON.parse(officerStr);
+          console.log('Restored security officer from storage:', officerData);
+          setSecurityOfficer(officerData);
+          
+          if (officerToken) {
+            if (officerExpiresAt && Date.now() > parseInt(officerExpiresAt)) {
+              localStorage.removeItem('securityOfficer');
+              localStorage.removeItem('securityOfficerToken');
+              localStorage.removeItem('securityOfficerTokenExpiresAt');
+            } else {
+              setSecurityOfficerSession({
+                user: officerData,
+                accessToken: officerToken,
+                expiresIn: officerExpiresAt ? parseInt(officerExpiresAt) - Date.now() : 3600000,
+                expiresAt: officerExpiresAt ? parseInt(officerExpiresAt) : Date.now() + 3600000,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error restoring security officer:', err);
+        }
+      }
 
       if (token && userStr) {
         try {
@@ -104,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
             localStorage.removeItem('tokenExpiresAt');
+            localStorage.removeItem('securityOfficer');
             setLoading(false);
             return;
           }
@@ -116,8 +194,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             expiresAt: expiresAt ? parseInt(expiresAt) : Date.now() + 3600000,
           });
 
-          // Use userData.id instead of user.id since state hasn't updated yet
           await fetchUserProfile(userData.id);
+          
+          // Only fetch security officer if not already restored from storage
+          if (!officerStr) {
+            await fetchSecurityOfficer(userData.id);
+          }
+
         } catch (error) {
           console.error('Error parsing stored user:', error);
           localStorage.removeItem('authToken');
@@ -203,12 +286,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Non-JSON response received:', text.substring(0, 200));
         throw new Error('Server returned invalid response format. Check server logs.');
       }
-    console.log('Full signin response data:', JSON.stringify(data, null, 2));
-    console.log('Token:', data.token || data.Token);
-    console.log('Profiles:', data.Profiles || data.profiles);
-    console.log('ExpiresIn:', data.expiresIn || data.ExpiresIn);
-    console.log('Signin response:', { status: response.status, data });
-      
+
+      console.log('Full signin response data:', JSON.stringify(data, null, 2));
 
       if (!response.ok) {
         const errorMessage = data.message || data.error || 'Login failed';
@@ -220,27 +299,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: { message: errorMessage } };
       }
 
-const token = data.token || data.Token;
-const userData = data.profiles || data.Profiles;  // ← lowercase 'p' first!
-const expiresIn = data.expiresIn || data.ExpiresIn || 3600;     
-
-
-const expiresAt = Date.now() + (expiresIn || 3600) * 1000;//
+      const token = data.token || data.Token;
+      const userData = data.profiles || data.Profiles;
+      const expiresIn = data.expiresIn || data.ExpiresIn || 3600;
+      const expiresAt = Date.now() + expiresIn * 1000;
 
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('tokenExpiresAt', expiresIn.toString());
+      localStorage.setItem('tokenExpiresAt', expiresAt.toString());
 
       setUser(userData);
       setSession({
-        user:userData,
+        user: userData,
         accessToken: token,
-        expiresIn: expiresIn || 3600,
+        expiresIn: expiresIn,
         expiresAt,
       });
 
-     fetchUserProfile(userData.id);
-  
+      await fetchUserProfile(userData.id);
+      await fetchSecurityOfficer(userData.id);
 
       toast({
         title: "Welcome back!",
@@ -251,33 +328,32 @@ const expiresAt = Date.now() + (expiresIn || 3600) * 1000;//
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: "Login Error", 
+        title: "Login Error",
         description: error.message || "An error occurred during login",
         variant: "destructive",
       });
       return { error };
     }
-
-    
   };
-
 
   const officerSignIn = async (name: string, badgeNumber: string) => {
     try {
       console.log('Attempting officer signin with:', { name, badgeNumber });
 
+      // FIXED: Send 'fullName' instead of 'name' to match API's OfficerLoginDto
       const response = await fetch(`${API_BASE_URL}/profiles/officer-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-        name,
-        badgeNumber })
+          fullName: name,  // API expects 'fullName', not 'name'
+          badgeNumber 
+        })
       });
 
       const data = await response.json();
-      console.log('Officer signin response:', { status: response.status, data });
+      console.log('Officer signin response:', data);
 
       if (!response.ok) {
         const errorMessage = data.message || data.error || 'Invalid badge number or name';
@@ -289,27 +365,56 @@ const expiresAt = Date.now() + (expiresIn || 3600) * 1000;//
         return { error: { message: errorMessage } };
       }
 
-      const { token, user: userData, profiles, expiresIn } = data;
-      const expiresAt = Date.now() + (expiresIn || 3600) * 1000;
+      // FIXED: Extract data correctly from the response
+      // Response structure: { token, profiles, securityOfficer, expiresIn }
+      const token = data.token || data.Token;
+      const userData = data.profiles || data.Profiles;  // Profile data is in 'profiles'
+      const officerData = data.securityOfficer || data.SecurityOfficer;
+      const expiresIn = data.expiresIn || data.ExpiresIn || 3600;
+      const expiresAt = Date.now() + expiresIn * 1000;
 
+      console.log('Parsed officer login data:', {
+        token: token ? 'present' : 'missing',
+        userData,
+        officerData,
+        expiresIn
+      });
+
+      // Validate we have required data
+      if (!token || !userData) {
+        console.error('Missing token or user data in response');
+        toast({
+          title: "Login Error",
+          description: "Invalid response from server",
+          variant: "destructive",
+        });
+        return { error: { message: "Invalid response from server" } };
+      }
+
+      // Store auth data
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('tokenExpiresAt', expiresAt.toString());
+
+      // Store security officer data if present
+      if (officerData) {
+        localStorage.setItem('securityOfficer', JSON.stringify(officerData));
+        setSecurityOfficer(officerData);
+        console.log('Security officer set:', officerData);
+      } else {
+        console.warn('No security officer data in response, will fetch separately');
+        // Fetch officer data if not included in response
+        await fetchSecurityOfficer(userData.id);
+      }
 
       setUser(userData);
       setSession({
         user: userData,
         accessToken: token,
-        expiresIn: expiresIn || 3600,
+        expiresIn: expiresIn,
         expiresAt,
       });
-
-      if (profiles) {
-        setUserProfile(profiles);
-      } else {
-        await fetchUserProfile(userData.id);
-      }
-      
+      setUserProfile(userData);
 
       toast({
         title: "Welcome!",
@@ -346,15 +451,21 @@ const expiresAt = Date.now() + (expiresIn || 3600) * 1000;//
         }
       }
 
+      // Clear all auth data
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       localStorage.removeItem('tokenExpiresAt');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('securityOfficer');
+      localStorage.removeItem('securityOfficerToken');
+      localStorage.removeItem('securityOfficerTokenExpiresAt');
 
       setUser(null);
       setSession(null);
       setUserProfile(null);
-      
+      setSecurityOfficer(null);
+      setSecurityOfficerSession(null);
+
       toast({
         title: "Signed out",
         description: "You have been successfully signed out.",
@@ -371,6 +482,8 @@ const expiresAt = Date.now() + (expiresIn || 3600) * 1000;//
   const value = {
     user,
     session,
+    securityOfficer,
+    securityOfficerSession,
     userProfile,
     loading,
     signUp,

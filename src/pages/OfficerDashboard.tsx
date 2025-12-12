@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Shield, MapPin, Clock, CheckCircle, Phone, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,31 +10,49 @@ const API_BASE_URL = 'https://localhost:44339/api';
 
 interface ServiceRequest {
   id: string;
-  user_id: string;
-  service_type: string;
+  userId: string;
+  serviceType: string;
   description: string;
-  location_address: string;
-  location_latitude: number;
-  location_longitude: number;
+  locationAddress: string;
+  locationLatitude: number;
+  locationLongitude: number;
   status: string;
-  created_at: string;
-  user_profile?: {
+  createdAt: string;
+  userProfile?: {
     firstName: string;
     lastName: string;
     phone: string;
   };
 }
+
+interface OfficerData {
+  id: string;
+  userId: string;
+  companyId: string;
+  badgeNumber: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  status: string;
+  specializations?: string[];
+  psiraNumber?: string;
+  isPsiraVerified: boolean;
+  psiraStatus?: string;
+  psiraCertificateExpiry?: string;
+  createdAt: string;
+}
+
 const OfficerDashboard = () => {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [officerStatus, setOfficerStatus] = useState<'available' | 'busy' | 'offline'>('offline');
-  const [officerId, setOfficerId] = useState<string | null>(null);
-  const [badgeNumber, setBadgeNumber] = useState<string>('');
-  const { user } = useAuth();
+  const [officerData, setOfficerData] = useState<OfficerData | null>(null);
+  const { user, securityOfficer } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    if (securityOfficer?.userId) {
       fetchOfficerData();
       fetchRequests();
       
@@ -46,54 +63,57 @@ const OfficerDashboard = () => {
 
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [securityOfficer]);
 
-  useEffect(() => {
-  if (user && user.id) {
-    setOfficerId(user.id);
-  }
-}, [user]);
-
- const fetchOfficerData = async () => {
-  try {
-    const token = localStorage.getItem('authToken');
-    
-    console.log('Fetching officer data for user:', user?.id);
-    
-    // Get officer information by user ID
-    const response = await fetch(`${API_BASE_URL}/securityofficers/user/${user?.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log('Officer fetch response:', response.status);
-
-    if (response.ok) {
-      const officerData = await response.json();
-      console.log('Officer data:', officerData);
+  const fetchOfficerData = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
       
-      setOfficerId(officerData.id);
-      setBadgeNumber(officerData.badgeNumber);
+      console.log('Fetching officer data for user:', securityOfficer?.userId);
       
-      // Map API status to UI status
-      const statusLower = officerData.status.toLowerCase();
-      if (statusLower === 'available') setOfficerStatus('available');
-      else if (statusLower === 'busy') setOfficerStatus('busy');
-      else setOfficerStatus('offline');
-    } else {
-      console.error('Failed to fetch officer data:', response.status);
+      // FIXED: Use the correct endpoint /user/{userId} instead of /{id}
+      const response = await fetch(`${API_BASE_URL}/securityofficers/user/${securityOfficer?.userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`, 
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Officer fetch response:', response.status);
+
+      if (response.ok) {
+        const data: OfficerData = await response.json();
+        console.log('Officer data:', data);
+        
+        setOfficerData(data);
+        
+        // Map API status to UI status
+        const statusLower = data.status.toLowerCase();
+        if (statusLower === 'available') setOfficerStatus('available');
+        else if (statusLower === 'busy') setOfficerStatus('busy');
+        else setOfficerStatus('offline');
+      } else {
+        console.error('Failed to fetch officer data:', response.status);
+        toast({
+          title: "Error",
+          description: "Could not load officer information. You may not be registered as a security officer.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching officer data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to connect to server.",
+        variant: "destructive",
+      });
     }
-  } catch (error) {
-    console.error('Error fetching officer data:', error);
-  }
-};
+  };
+
   const fetchRequests = async () => {
     try {
       const token = localStorage.getItem('authToken');
       
-      // Get pending service requests
       const response = await fetch(`${API_BASE_URL}/servicerequests/pending`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -111,8 +131,7 @@ const OfficerDashboard = () => {
 
       const data = await response.json();
       
-      // Format the data to match UI expectations
-      const formattedRequests = data.map((req: any) => ({
+      const formattedRequests: ServiceRequest[] = data.map((req: any) => ({
         id: req.id,
         userId: req.userId,
         serviceType: req.serviceType,
@@ -138,24 +157,36 @@ const OfficerDashboard = () => {
   };
 
   const updateStatus = async (newStatus: 'available' | 'busy' | 'offline') => {
+    if (!officerData?.id) {
+      console.error('No officer ID available');
+      toast({
+        title: "Error",
+        description: "Officer information not loaded. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem('authToken');
       
-      // Map UI status to API status
-      let apiStatus = 'offline';
-      if (newStatus === 'available') apiStatus = 'available';
-      else if (newStatus === 'busy') apiStatus = 'busy';
+      console.log('Updating status:', { officerId: officerData.id, newStatus });
 
-      const response = await fetch(`${API_BASE_URL}/securityofficers/status`, {
+      // FIXED: Use officerData.id (the officer's ID, not userId)
+      const response = await fetch(`${API_BASE_URL}/securityofficers/${officerData.id}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: apiStatus }),
+        body: JSON.stringify({ status: newStatus }),
       });
 
+      console.log('Status update response:', response.status);
+
       if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Status update failed:', errorData);
         throw new Error('Failed to update status');
       }
 
@@ -169,7 +200,7 @@ const OfficerDashboard = () => {
       // Update location when going available
       if (newStatus === 'available' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (position) => {
-          await fetch(`${API_BASE_URL}/securityofficers/${officerId}/location`, {
+          await fetch(`${API_BASE_URL}/securityofficers/${officerData.id}/location`, {
             method: 'PUT',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -193,17 +224,25 @@ const OfficerDashboard = () => {
   };
 
   const acceptRequest = async (requestId: string) => {
+    if (!officerData?.id) {
+      toast({
+        title: "Error",
+        description: "Officer information not loaded.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem('authToken');
       
-      // Accept the request
       const response = await fetch(`${API_BASE_URL}/servicerequests/${requestId}/accept`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ officerId }),
+        body: JSON.stringify({ officerId: officerData.id }),
       });
 
       if (!response.ok) {
@@ -215,10 +254,7 @@ const OfficerDashboard = () => {
         description: "You have successfully accepted the service request.",
       });
 
-      // Update officer status to busy
       await updateStatus('busy');
-
-      // Refresh requests
       await fetchRequests();
     } catch (error) {
       console.error('Error accepting request:', error);
@@ -231,9 +267,10 @@ const OfficerDashboard = () => {
   };
 
   const getServiceTypeColor = (type: string) => {
-    switch (type) {
+    switch (type?.toLowerCase()) {
       case 'emergency': return 'bg-red-500/20 text-red-400';
-      case 'armed_response': return 'bg-orange-500/20 text-orange-400';
+      case 'armed_response':
+      case 'armedresponse': return 'bg-orange-500/20 text-orange-400';
       case 'patrol': return 'bg-blue-500/20 text-blue-400';
       case 'escort': return 'bg-green-500/20 text-green-400';
       case 'surveillance': return 'bg-purple-500/20 text-purple-400';
@@ -250,6 +287,10 @@ const OfficerDashboard = () => {
     }
   };
 
+  const formatServiceType = (type: string) => {
+    return type?.replace('_', ' ').toUpperCase() || 'UNKNOWN';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 p-4">
       <div className="max-w-7xl mx-auto">
@@ -260,9 +301,11 @@ const OfficerDashboard = () => {
             <div>
               <h1 className="text-2xl font-bold text-white">Officer Dashboard</h1>
               <p className="text-white/70">
-                  Welcome, {user?.firstName} {user?.lastName}
+                Welcome, {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-2xl font-bold text-white">{badgeNumber}</p>
+              {officerData?.badgeNumber && (
+                <p className="text-sm text-orange-400">Badge: {officerData.badgeNumber}</p>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -320,9 +363,8 @@ const OfficerDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white/70 text-sm">Badge</p>
-                  <p className="text-2xl font-bold text-white">{user?.user_metadata?.badgeNumber}</p>
-                  <p className="text-2xl font-bold text-white">{badgeNumber || 'N/A'}</p>
+                  <p className="text-white/70 text-sm">Badge Number</p>
+                  <p className="text-2xl font-bold text-white">{officerData?.badgeNumber || 'N/A'}</p>
                 </div>
                 <User className="h-8 w-8 text-green-400" />
               </div>
@@ -351,25 +393,25 @@ const OfficerDashboard = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
-                          <Badge className={getServiceTypeColor(request.service_type)}>
-                            {request.service_type.replace('_', ' ').toUpperCase()}
+                          <Badge className={getServiceTypeColor(request.serviceType)}>
+                            {formatServiceType(request.serviceType)}
                           </Badge>
                           <span className="text-white/70 text-sm">
-                            {new Date(request.created_at).toLocaleTimeString()}
+                            {new Date(request.createdAt).toLocaleTimeString()}
                           </span>
                         </div>
                         <div className="space-y-2">
-                          {request.user_profile && (
+                          {request.userProfile && (
                             <div className="flex items-center space-x-2 text-white">
                               <User className="h-4 w-4" />
-                              <span>{request.user_profile.firstName} {request.user_profile.lastName}</span>
+                              <span>{request.userProfile.firstName} {request.userProfile.lastName}</span>
                               <Phone className="h-4 w-4 ml-4" />
-                              <span>{request.user_profile.phone}</span>
+                              <span>{request.userProfile.phone}</span>
                             </div>
                           )}
                           <div className="flex items-center space-x-2 text-white/70">
                             <MapPin className="h-4 w-4" />
-                            <span>{request.location_address}</span>
+                            <span>{request.locationAddress}</span>
                           </div>
                           {request.description && (
                             <p className="text-white/80 text-sm">{request.description}</p>
