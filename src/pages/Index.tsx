@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ServiceSelector from '@/components/ServiceSelector';
+import OfficersList from '@/components/OfficersList';
 import SecurityMap from '@/components/SecurityMap';
 import EmergencyButton from '@/components/EmergencyButton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -203,6 +204,14 @@ const Index = () => {
           {/* Service Selection */}
           <div className="lg:col-span-1 space-y-6">
             <ServiceSelector onServiceSelect={handleServiceSelect} selectedService={selectedService} />
+            
+            {/* Officers List - appears when service is selected */}
+            {selectedService && (
+              <OfficersList 
+                selectedService={selectedService}
+                onSelectOfficer={(officer) => console.log('Selected officer:', officer)}
+              />
+            )}
             
             {/* Emergency Button */}
             <Card className="bg-red-600/20 border-red-500/50">
