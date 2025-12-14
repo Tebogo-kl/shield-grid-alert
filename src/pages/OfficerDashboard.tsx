@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, MapPin, Clock, CheckCircle, Phone, User } from 'lucide-react';
+import { Shield, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import RequestDetailCard from '@/components/RequestDetailCard';
 
 const API_BASE_URL = 'https://localhost:44339/api';
 
@@ -389,48 +390,14 @@ const OfficerDashboard = () => {
             ) : (
               <div className="space-y-4">
                 {requests.map((request) => (
-                  <div key={request.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Badge className={getServiceTypeColor(request.serviceType)}>
-                            {formatServiceType(request.serviceType)}
-                          </Badge>
-                          <span className="text-white/70 text-sm">
-                            {new Date(request.createdAt).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {request.userProfile && (
-                            <div className="flex items-center space-x-2 text-white">
-                              <User className="h-4 w-4" />
-                              <span>{request.userProfile.firstName} {request.userProfile.lastName}</span>
-                              <Phone className="h-4 w-4 ml-4" />
-                              <span>{request.userProfile.phone}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center space-x-2 text-white/70">
-                            <MapPin className="h-4 w-4" />
-                            <span>{request.locationAddress}</span>
-                          </div>
-                          {request.description && (
-                            <p className="text-white/80 text-sm">{request.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex space-x-2 ml-4">
-                        <Button
-                          size="sm"
-                          onClick={() => acceptRequest(request.id)}
-                          className="bg-green-600 hover:bg-green-700"
-                          disabled={officerStatus !== 'available'}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Accept
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                  <RequestDetailCard
+                    key={request.id}
+                    request={request}
+                    onAccept={acceptRequest}
+                    disabled={officerStatus !== 'available'}
+                    getServiceTypeColor={getServiceTypeColor}
+                    formatServiceType={formatServiceType}
+                  />
                 ))}
               </div>
             )}
