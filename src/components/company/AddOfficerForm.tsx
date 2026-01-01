@@ -170,18 +170,23 @@ const AddOfficerForm: React.FC<AddOfficerFormProps> = ({ onSubmit, onCancel }) =
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="certification" className="text-white/90">Certification</Label>
-                  <div className="relative">
-                    <FileText className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-                    <Input
-                      id="certification"
-                      type="text"
-                      value={formData.certification}
-                      onChange={(e) => handleInputChange('certification', e.target.value)}
-                      className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                      placeholder="Armed Response"
-                      required
-                    />
-                  </div>
+                  <Select value={formData.certification} onValueChange={(value) => handleInputChange('certification', value)}>
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-white/50" />
+                        <SelectValue placeholder="Select certification" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                      <SelectItem value="all" className="text-white hover:bg-gray-700">All</SelectItem>
+                      <SelectItem value="armed_response" className="text-white hover:bg-gray-700">Armed Response</SelectItem>
+                      <SelectItem value="personal_security_escort" className="text-white hover:bg-gray-700">Personal Security and Escort</SelectItem>
+                      <SelectItem value="patrol_service" className="text-white hover:bg-gray-700">Patrol Service</SelectItem>
+                      <SelectItem value="emergency_response" className="text-white hover:bg-gray-700">Emergency Response & Assistance</SelectItem>
+                      <SelectItem value="escort_service" className="text-white hover:bg-gray-700">Escort Service</SelectItem>
+                      <SelectItem value="security_consultation" className="text-white hover:bg-gray-700">Security Consultation Services</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
