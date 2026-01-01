@@ -60,7 +60,7 @@ const PsiraVerificationModal: React.FC<PsiraVerificationModalProps> = ({
 
     // Open PSIRA verification website
     window.open(
-      `https://digitalservices.psira.co.za/verify-user/${psiraNumber}`,
+      `https://digitalservices.psira.co.za/verify-user/8/${psiraNumber}`,
       'psira_verification',
       'width=1024,height=768,scrollbars=yes,resizable=yes'
     );

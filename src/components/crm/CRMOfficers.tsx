@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   XCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Sparkles
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ interface CRMOfficersProps {
   officerVerifications: Record<string, { open: boolean; psira: string; verified: boolean }>;
   setOfficerVerifications: React.Dispatch<React.SetStateAction<Record<string, { open: boolean; psira: string; verified: boolean }>>>;
   onVerifyOfficer: (id: string) => void;
+  onOpenAIVerification?: (officerId: string) => void; // New prop
 }
 
 const CRMOfficers: React.FC<CRMOfficersProps> = ({
@@ -55,7 +57,8 @@ const CRMOfficers: React.FC<CRMOfficersProps> = ({
   onDeleteOfficer,
   officerVerifications,
   setOfficerVerifications,
-  onVerifyOfficer
+  onVerifyOfficer,
+  onOpenAIVerification // Destructure new prop
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -236,8 +239,22 @@ const CRMOfficers: React.FC<CRMOfficersProps> = ({
                     </p>
                   </div>
 
-                  {/* PSIRA Verification */}
-                  <div className="mt-4">
+                  {/* AI Verification Button */}
+                  {onOpenAIVerification && (
+                    <div className="mt-4">
+                      <Button 
+                        onClick={() => onOpenAIVerification(officer.id)}
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        size="sm"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        AI Compliance Check
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Manual PSIRA Verification (Original) */}
+                  <div className="mt-3">
                     <Collapsible open={verification.open} onOpenChange={() => toggleOfficerVerification(officer.id)}>
                       <CollapsibleTrigger asChild>
                         <Button 
@@ -245,7 +262,7 @@ const CRMOfficers: React.FC<CRMOfficersProps> = ({
                           size="sm" 
                           className="w-full justify-between border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700"
                         >
-                          Verify PSIRA
+                          Manual PSIRA Verify
                           {verification.open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </Button>
                       </CollapsibleTrigger>

@@ -18,6 +18,8 @@ import SecurityMap from '@/components/SecurityMap';
 import EmergencyButton from '@/components/EmergencyButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import ServiceRequestForm from '@/components/ServiceRequestForm';
+
 
 const Index = () => {
   const [selectedService, setSelectedService] = useState('');
@@ -286,6 +288,19 @@ const Index = () => {
           </div>
         </div>
 
+ 
+ 
+ {selectedService && (
+  <ServiceRequestForm
+    selectedService={selectedService}
+    userLocation={userLocation}
+    locationAddress={locationName}
+    onRequestCreated={(request) => {
+      console.log('Request created:', request);
+      setSelectedService(''); // Reset after submit
+    }}
+  />
+ )}
         {/* Service Features */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-white/5 border-white/10">

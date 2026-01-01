@@ -11,8 +11,9 @@ import CRMCompliance from '@/components/crm/CRMCompliance';
 import CRMSchedule from '@/components/crm/CRMSchedule';
 import CRMReports from '@/components/crm/CRMReports';
 import CRMSettings from '@/components/crm/CRMSettings';
-import { Menu, X } from 'lucide-react';
+import { Menu, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PsiraClaudeVerification from '@/components/PsiraClaudeVerification';
 
 const API_BASE_URL = 'https://localhost:44339/api';
 
@@ -47,6 +48,11 @@ const CompanyDashboard = () => {
   const [companyPsiraNumber, setCompanyPsiraNumber] = useState('');
   const [companyVerified, setCompanyVerified] = useState(false);
   const [officerVerifications, setOfficerVerifications] = useState<Record<string, { open: boolean; psira: string; verified: boolean }>>({});
+  
+  // Add this state for verification modal
+  const [showVerification, setShowVerification] = useState(false);
+  const [selectedOfficerId, setSelectedOfficerId] = useState<string | null>(null);
+  
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
@@ -92,6 +98,7 @@ const CompanyDashboard = () => {
     }
   };
 
+  
   const fetchOfficers = async (companyId: string, token: string | null) => {
     try {
       const officersResponse = await fetch(`${API_BASE_URL}/securityofficers/company/${companyId}`, {
@@ -202,6 +209,12 @@ const CompanyDashboard = () => {
     toast({ title: "Success!", description: "Officer PSIRA number verified." });
   };
 
+  // Add handler for opening verification modal
+  const handleOpenVerification = (officerId: string) => {
+    setSelectedOfficerId(officerId);
+    setShowVerification(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -230,6 +243,7 @@ const CompanyDashboard = () => {
             officerVerifications={officerVerifications}
             setOfficerVerifications={setOfficerVerifications}
             onVerifyOfficer={handleVerifyOfficer}
+            onOpenAIVerification={handleOpenVerification} // Pass this new prop
           />
         );
       case 'clients':
@@ -294,6 +308,26 @@ const CompanyDashboard = () => {
       <main className="flex-1 p-4 lg:p-6 overflow-auto lg:ml-0 pt-16 lg:pt-6">
         {renderContent()}
       </main>
+
+      {/* AI Verification Modal - Add this at the end of the return statement */}
+      {selectedOfficerId && (
+        <PsiraClaudeVerification
+          isOpen={showVerification}
+          onClose={() => {
+            setShowVerification(false);
+            setSelectedOfficerId(null);
+          }}
+          entityId={selectedOfficerId}
+          entityType="officer"
+          onVerificationComplete={(result) => {
+            console.log('Verification complete:', result);
+            if (company) {
+              const token = localStorage.getItem('authToken');
+              fetchOfficers(company.id, token);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
