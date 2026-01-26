@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, MapPin, Clock, CheckCircle, Phone, User, Navigation } from 'lucide-react';
+import { Shield, MapPin, Clock, CheckCircle, Phone, User, Navigation, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import IncidentReportForm from '@/components/IncidentReportForm';
 
 const API_BASE_URL = 'https://localhost:44339/api';
 
@@ -465,6 +466,24 @@ const OfficerDashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Incident Report Section */}
+        {myRequests.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-6">
+              <FileText className="h-6 w-6 text-orange-400" />
+              <h2 className="text-2xl font-bold text-white">Incident Report & Communication</h2>
+            </div>
+            <div className="max-w-2xl">
+              <IncidentReportForm 
+                userType="officer"
+                requestId={myRequests[0]?.id || 'REQ-001'}
+                serviceType={getServiceTypeName(myRequests[0]?.serviceType || 0)}
+                onSubmit={(report) => console.log('Officer report submitted:', report)}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
