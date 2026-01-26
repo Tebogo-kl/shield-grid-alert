@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, MapPin, Clock, Users, Star } from 'lucide-react';
+import { Shield, AlertTriangle, MapPin, Clock, Users, Star, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import ServiceSelector from '@/components/ServiceSelector';
 import OfficersList from '@/components/OfficersList';
 import SecurityMap from '@/components/SecurityMap';
 import EmergencyButton from '@/components/EmergencyButton';
+import IncidentReportForm from '@/components/IncidentReportForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ServiceRequestForm from '@/components/ServiceRequestForm';
@@ -327,6 +328,25 @@ const Index = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Incident Report Section - Only show for logged in users */}
+        {user && (
+          <div className="mt-12">
+            <div className="flex items-center gap-2 mb-6">
+              <FileText className="h-6 w-6 text-blue-400" />
+              <h2 className="text-2xl font-bold text-white">Report & Feedback</h2>
+            </div>
+            <div className="max-w-2xl">
+              <IncidentReportForm 
+                userType="user"
+                requestId="REQ-001"
+                officerName="Officer John Doe"
+                serviceType="Armed Response"
+                onSubmit={(report) => console.log('User report submitted:', report)}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
