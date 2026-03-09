@@ -5,10 +5,8 @@ import AddOfficerForm from '@/components/company/AddOfficerForm';
 import CRMSidebar from '@/components/crm/CRMSidebar';
 import CRMOverview from '@/components/crm/CRMOverview';
 import CRMOfficers from '@/components/crm/CRMOfficers';
-import CRMClients from '@/components/crm/CRMClients';
 import CRMJobs from '@/components/crm/CRMJobs';
 import CRMCompliance from '@/components/crm/CRMCompliance';
-import CRMSchedule from '@/components/crm/CRMSchedule';
 import CRMReports from '@/components/crm/CRMReports';
 import CRMSettings from '@/components/crm/CRMSettings';
 import { Menu, Sparkles, X } from 'lucide-react';
@@ -246,12 +244,8 @@ const CompanyDashboard = () => {
             onOpenAIVerification={handleOpenVerification} // Pass this new prop
           />
         );
-      case 'clients':
-        return <CRMClients />;
       case 'jobs':
         return <CRMJobs />;
-      case 'schedule':
-        return <CRMSchedule />;
       case 'reports':
         return <CRMReports />;
       case 'compliance':
