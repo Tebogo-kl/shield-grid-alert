@@ -244,12 +244,8 @@ const CompanyDashboard = () => {
             onOpenAIVerification={handleOpenVerification} // Pass this new prop
           />
         );
-      case 'clients':
-        return <CRMClients />;
       case 'jobs':
         return <CRMJobs />;
-      case 'schedule':
-        return <CRMSchedule />;
       case 'reports':
         return <CRMReports />;
       case 'compliance':
