@@ -23,9 +23,7 @@ interface CRMSidebarProps {
 const menuItems = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'officers', label: 'Officers', icon: Shield },
-  { id: 'clients', label: 'Clients', icon: Users },
   { id: 'jobs', label: 'Jobs', icon: Briefcase },
-  { id: 'schedule', label: 'Schedule', icon: Calendar },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'compliance', label: 'Compliance', icon: FileText },
   { id: 'settings', label: 'Settings', icon: Settings },
