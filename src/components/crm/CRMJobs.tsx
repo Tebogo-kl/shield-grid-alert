@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Briefcase, Plus, Search, Calendar, MapPin, User, Clock, X, ArrowLeft, Edit, Trash2
+  Briefcase, Plus, Search, Calendar, MapPin, User, Clock, X, ArrowLeft, Edit, Trash2, Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,29 +12,54 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 
+const API_BASE_URL = 'https://localhost:44339/api';
+
 interface Job {
   id: string;
-  title: string;
-  client: string;
-  type: string;
-  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  jobTitle: string;
+  clientName: string;
+  jobType: string;
   assignedOfficer: string;
   location: string;
   startDate: string;
   endDate: string;
   value: number;
-  description?: string;
-  contactPhone?: string;
-  contactEmail?: string;
+  description: string;
+  clientContactNumber: string;
+  clientEmailAddress: string;
+  status?: 'pending' | 'active' | 'completed' | 'cancelled';
 }
 
-const initialJobs: Job[] = [
-  { id: '1', title: 'Executive Protection', client: 'ABC Corporation', type: 'Escort', status: 'active', assignedOfficer: 'John Doe', location: 'Sandton', startDate: '2024-12-01', endDate: '2024-12-31', value: 25000, description: 'VIP executive protection detail for CEO.', contactPhone: '011-555-0100', contactEmail: 'ceo@abccorp.co.za' },
-  { id: '2', title: 'Night Patrol', client: 'XYZ Mall', type: 'Patrol', status: 'active', assignedOfficer: 'Jane Smith', location: 'Rosebank', startDate: '2024-11-15', endDate: '2025-01-15', value: 18000, description: 'Nightly patrol of mall premises.', contactPhone: '011-555-0200', contactEmail: 'security@xyzmall.co.za' },
-  { id: '3', title: 'Event Security - Conference', client: 'Hotel Grand', type: 'Event Security', status: 'pending', assignedOfficer: 'Unassigned', location: 'Pretoria', startDate: '2024-12-20', endDate: '2024-12-22', value: 12000, description: 'Security for annual business conference.', contactPhone: '012-555-0300', contactEmail: 'events@hotelgrand.co.za' },
-  { id: '4', title: 'CCTV Monitoring', client: 'Tech Park Estate', type: 'Surveillance', status: 'completed', assignedOfficer: 'Mike Johnson', location: 'Midrand', startDate: '2024-11-01', endDate: '2024-11-30', value: 8000, description: '24/7 CCTV monitoring of tech park.', contactPhone: '011-555-0400', contactEmail: 'admin@techpark.co.za' },
-  { id: '5', title: 'Armed Response Retainer', client: 'ABC Corporation', type: 'Armed Response', status: 'active', assignedOfficer: 'Team Alpha', location: 'Sandton', startDate: '2024-01-01', endDate: '2024-12-31', value: 35000, description: 'Ongoing armed response retainer contract.', contactPhone: '011-555-0100', contactEmail: 'security@abccorp.co.za' },
-];
+interface CreateJobDto {
+  jobTitle: string;
+  clientName: string;
+  serviceType: string;
+  officerOnDuty: string;
+  clientLocation: string;
+  startDate: string;
+  endDate: string;
+  value: number;
+  description: string;
+  clientContactNumber: string;
+  clientEmailAddress: string;
+}
+
+interface JobsResponse {
+  id: string;
+  ownerId: string;
+  companyName: string;
+  serviceType: string;
+  estimatedDuration: string;
+  incidents: string;
+  reports: string;
+  clientName: string;
+  clientContactNumber: string;
+  clientEmailAddress: string;
+  clientLocation: string;
+  officerOnDuty: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 const jobTypes = ['Armed Response', 'Patrol', 'Escort', 'Event Security', 'Surveillance'];
 
@@ -60,17 +85,25 @@ const getTypeColor = (type: string) => {
 };
 
 // ─── Create Job Form ───
-const CreateJobForm: React.FC<{ onSubmit: (job: Job) => void; onCancel: () => void }> = ({ onSubmit, onCancel }) => {
-  const [form, setForm] = useState({ title: '', client: '', type: '', assignedOfficer: '', location: '', startDate: '', endDate: '', value: '', description: '', contactPhone: '', contactEmail: '' });
+const CreateJobForm: React.FC<{ onSubmit: (job: CreateJobDto) => Promise<void>; onCancel: () => void; isLoading: boolean }> = 
+  ({ onSubmit, onCancel, isLoading }) => {
+  const [form, setForm] = useState<CreateJobDto>({
+    jobTitle: '',
+    clientName: '',
+    serviceType: '',
+    officerOnDuty: '',
+    clientLocation: '',
+    startDate: '',
+    endDate: '',
+    value: 0,
+    description: '',
+    clientContactNumber: '',
+    clientEmailAddress: ''
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      id: Date.now().toString(),
-      ...form,
-      value: parseFloat(form.value) || 0,
-      status: 'pending',
-    });
+    await onSubmit(form);
   };
 
   return (
@@ -87,16 +120,30 @@ const CreateJobForm: React.FC<{ onSubmit: (job: Job) => void; onCancel: () => vo
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <Label className="text-slate-300">Job Title *</Label>
-                <Input required value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="e.g. Executive Protection" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                  required 
+                  value={form.jobTitle} 
+                  onChange={e => setForm({...form, jobTitle: e.target.value})} 
+                  placeholder="e.g. Executive Protection" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Client Name *</Label>
-                <Input required value={form.client} onChange={e => setForm({...form, client: e.target.value})} placeholder="e.g. ABC Corporation" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                  required 
+                  value={form.clientName} 
+                  onChange={e => setForm({...form, clientName: e.target.value})} 
+                  placeholder="e.g. ABC Corporation" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Job Type *</Label>
-                <Select value={form.type} onValueChange={v => setForm({...form, type: v})}>
-                  <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <Select value={form.serviceType} onValueChange={v => setForm({...form, serviceType: v})}>
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
                   <SelectContent>
                     {jobTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -104,40 +151,90 @@ const CreateJobForm: React.FC<{ onSubmit: (job: Job) => void; onCancel: () => vo
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Assigned Officer</Label>
-                <Input value={form.assignedOfficer} onChange={e => setForm({...form, assignedOfficer: e.target.value})} placeholder="Officer name or team" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                value={form.officerOnDuty} 
+                  onChange={e => setForm({...form, officerOnDuty: e.target.value})} 
+                  placeholder="Officer name or team" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Location *</Label>
-                <Input required value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="e.g. Sandton" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                  required 
+                  value={form.clientLocation} 
+                  onChange={e => setForm({...form, clientLocation: e.target.value})} 
+                  placeholder="e.g. Sandton" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Contract Value (R)</Label>
-                <Input type="number" value={form.value} onChange={e => setForm({...form, value: e.target.value})} placeholder="0" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                  type="number" 
+                  value={form.value || ''} 
+                  onChange={e => setForm({...form, value: parseFloat(e.target.value) || 0})} 
+                  placeholder="0" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Start Date *</Label>
-                <Input required type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} className="bg-slate-700/50 border-slate-600 text-white" />
+                <Input 
+                  required 
+                  type="date" 
+                  value={form.startDate} 
+                  onChange={e => setForm({...form, startDate: e.target.value})} 
+                  className="bg-slate-700/50 border-slate-600 text-white" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">End Date *</Label>
-                <Input required type="date" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} className="bg-slate-700/50 border-slate-600 text-white" />
+                <Input 
+                  required 
+                  type="date" 
+                  value={form.endDate} 
+                  onChange={e => setForm({...form, endDate: e.target.value})} 
+                  className="bg-slate-700/50 border-slate-600 text-white" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Contact Phone</Label>
-                <Input value={form.contactPhone} onChange={e => setForm({...form, contactPhone: e.target.value})} placeholder="011-555-0000" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                  value={form.clientContactNumber} 
+                  onChange={e => setForm({...form, clientContactNumber: e.target.value})} 
+                  placeholder="011-555-0000" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Contact Email</Label>
-                <Input type="email" value={form.contactEmail} onChange={e => setForm({...form, contactEmail: e.target.value})} placeholder="email@example.com" className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+                <Input 
+                  type="email" 
+                  value={form.clientEmailAddress} 
+                  onChange={e => setForm({...form, clientEmailAddress: e.target.value})} 
+                  placeholder="email@example.com" 
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label className="text-slate-300">Description</Label>
-              <Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Job details and requirements..." className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 min-h-[100px]" />
+              <Textarea 
+                value={form.description} 
+                onChange={e => setForm({...form, description: e.target.value})} 
+                placeholder="Job details and requirements..." 
+                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 min-h-[100px]" 
+              />
             </div>
             <div className="flex gap-3 pt-2">
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">Create Job</Button>
-              <Button type="button" variant="outline" onClick={onCancel} className="border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700">Cancel</Button>
+              <Button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {isLoading ? 'Creating...' : 'Create Job'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel} className="border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700">
+                Cancel
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -147,7 +244,8 @@ const CreateJobForm: React.FC<{ onSubmit: (job: Job) => void; onCancel: () => vo
 };
 
 // ─── Job Detail View ───
-const JobDetailView: React.FC<{ job: Job; onBack: () => void; onDelete: (id: string) => void }> = ({ job, onBack, onDelete }) => {
+const JobDetailView: React.FC<{ job: Job; onBack: () => void; onDelete: (id: string) => Promise<void>; isLoading: boolean }> = 
+  ({ job, onBack, onDelete, isLoading }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -155,11 +253,18 @@ const JobDetailView: React.FC<{ job: Job; onBack: () => void; onDelete: (id: str
           <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white hover:bg-slate-800">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
-          <h2 className="text-2xl font-bold text-white">{job.title}</h2>
-          <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+          <h2 className="text-2xl font-bold text-white">{job.jobTitle}</h2>
+          <Badge className={getStatusColor(job.status || 'pending')}>{job.status || 'pending'}</Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={() => onDelete(job.id)} className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300">
-          <Trash2 className="h-4 w-4 mr-1" /> Delete
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => onDelete(job.id)} 
+          disabled={isLoading}
+          className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+        >
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+          {isLoading ? 'Deleting...' : 'Delete'}
         </Button>
       </div>
 
@@ -171,7 +276,7 @@ const JobDetailView: React.FC<{ job: Job; onBack: () => void; onDelete: (id: str
             {job.description && <p className="text-slate-300 text-sm">{job.description}</p>}
             <div className="grid grid-cols-2 gap-4 pt-2">
               {[
-                { icon: Briefcase, label: 'Client', value: job.client },
+                { icon: Briefcase, label: 'Client', value: job.clientName },
                 { icon: User, label: 'Assigned Officer', value: job.assignedOfficer || 'Unassigned' },
                 { icon: MapPin, label: 'Location', value: job.location },
                 { icon: Calendar, label: 'Start Date', value: job.startDate },
@@ -200,20 +305,20 @@ const JobDetailView: React.FC<{ job: Job; onBack: () => void; onDelete: (id: str
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 text-sm">Type</span>
-                <Badge className={getTypeColor(job.type)} variant="outline">{job.type}</Badge>
+                <Badge className={getTypeColor(job.jobType)} variant="outline">{job.jobType}</Badge>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader><CardTitle className="text-white text-sm">Contact Information</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
-              {job.contactPhone && (
-                <div><p className="text-slate-400 text-xs">Phone</p><p className="text-white">{job.contactPhone}</p></div>
+              {job.clientContactNumber && (
+                <div><p className="text-slate-400 text-xs">Phone</p><p className="text-white">{job.clientContactNumber}</p></div>
               )}
-              {job.contactEmail && (
-                <div><p className="text-slate-400 text-xs">Email</p><p className="text-white">{job.contactEmail}</p></div>
+              {job.clientEmailAddress && (
+                <div><p className="text-slate-400 text-xs">Email</p><p className="text-white">{job.clientEmailAddress}</p></div>
               )}
-              {!job.contactPhone && !job.contactEmail && <p className="text-slate-500 italic">No contact info available</p>}
+              {!job.clientContactNumber && !job.clientEmailAddress && <p className="text-slate-500 italic">No contact info available</p>}
             </CardContent>
           </Card>
         </div>
@@ -226,35 +331,155 @@ const JobDetailView: React.FC<{ job: Job; onBack: () => void; onDelete: (id: str
 const CRMJobs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Fetch all jobs on component mount
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/Jobs`);
+      if (!response.ok) throw new Error('Failed to fetch jobs');
+      const data: JobsResponse[] = await response.json();
+      
+      // Transform API response to Job interface
+      const transformedJobs: Job[] = data.map(item => ({
+        id: item.id,
+        jobTitle: item.companyName, // Map companyName to jobTitle (you might want to add jobTitle to your entity)
+        clientName: item.clientName,
+        jobType: item.serviceType,
+        assignedOfficer: item.officerOnDuty,
+        location: item.clientLocation,
+        startDate: item.createdAt.split('T')[0], // You'll need to store startDate in your entity
+        endDate: item.updatedAt.split('T')[0], // You'll need to store endDate in your entity
+        value: 0, // You'll need to add value to your entity
+        description: '', // You'll need to add description to your entity
+        clientContactNumber: item.clientContactNumber,
+        clientEmailAddress: item.clientEmailAddress,
+        status: 'active' // Default status
+      }));
+      
+      setJobs(transformedJobs);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load jobs');
+      console.error('Error fetching jobs:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateJob = async (createJobDto: CreateJobDto) => {
+    try {
+      setSubmitting(true);
+      // Replace with actual ownerId from your auth system
+      const ownerId = '12345678-1234-1234-1234-123456789012';
+      
+      const response = await fetch(`${API_BASE_URL}/RegisterClient`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createJobDto),
+      });
+      
+      if (!response.ok) throw new Error('Failed to create job');
+      
+      const newJob: JobsResponse = await response.json();
+      
+      // Transform response to Job interface
+      const transformedJob: Job = {
+        id: newJob.id,
+        jobTitle: createJobDto.jobTitle,
+        clientName: createJobDto.clientName,
+        jobType: createJobDto.serviceType,
+        assignedOfficer: createJobDto.officerOnDuty,
+        location: createJobDto.clientLocation,
+        startDate: createJobDto.startDate,
+        endDate: createJobDto.endDate,
+        value: createJobDto.value,
+        description: createJobDto.description,
+        clientContactNumber: createJobDto.clientContactNumber,
+        clientEmailAddress: createJobDto.clientEmailAddress,
+        status: 'pending'
+      };
+      
+      setJobs(prev => [transformedJob, ...prev]);
+      setView('list');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create job');
+      console.error('Error creating job:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteJob = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) return;
+    
+    try {
+      setDeleting(true);
+      const response = await fetch(`${API_BASE_URL}/Jobs/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete job');
+      
+      setJobs(prev => prev.filter(j => j.id !== id));
+      setView('list');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete job');
+      console.error('Error deleting job:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          job.client.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = job.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          job.clientName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleCreateJob = (job: Job) => {
-    setJobs(prev => [job, ...prev]);
-    setView('list');
-  };
-
-  const handleDeleteJob = (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this job?')) return;
-    setJobs(prev => prev.filter(j => j.id !== id));
-    setView('list');
-  };
-
-  if (view === 'create') return <CreateJobForm onSubmit={handleCreateJob} onCancel={() => setView('list')} />;
-  if (view === 'detail' && selectedJob) return <JobDetailView job={selectedJob} onBack={() => setView('list')} onDelete={handleDeleteJob} />;
-
   const totalValue = jobs.filter(j => j.status === 'active').reduce((sum, j) => sum + j.value, 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (view === 'create') {
+    return <CreateJobForm onSubmit={handleCreateJob} onCancel={() => setView('list')} isLoading={submitting} />;
+  }
+  
+  if (view === 'detail' && selectedJob) {
+    return <JobDetailView job={selectedJob} onBack={() => setView('list')} onDelete={handleDeleteJob} isLoading={deleting} />;
+  }
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">
+          <p>Error: {error}</p>
+          <Button variant="ghost" size="sm" onClick={() => setError(null)} className="mt-2">
+            Dismiss
+          </Button>
+        </div>
+      )}
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white">Jobs & Contracts</h2>
@@ -269,8 +494,11 @@ const CRMJobs: React.FC = () => {
         {['all', 'active', 'pending', 'completed', 'cancelled'].map((status) => {
           const count = status === 'all' ? jobs.length : jobs.filter(j => j.status === status).length;
           return (
-            <button key={status} onClick={() => setStatusFilter(status)}
-              className={`bg-slate-800/50 border rounded-lg p-4 text-center transition-all ${statusFilter === status ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-slate-600'}`}>
+            <button 
+              key={status} 
+              onClick={() => setStatusFilter(status)}
+              className={`bg-slate-800/50 border rounded-lg p-4 text-center transition-all ${statusFilter === status ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-slate-600'}`}
+            >
               <p className="text-2xl font-bold text-white">{count}</p>
               <p className="text-slate-400 text-sm capitalize">{status}</p>
             </button>
@@ -283,8 +511,12 @@ const CRMJobs: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search jobs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" />
+              <Input 
+                placeholder="Search jobs..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400" 
+              />
             </div>
             <div className="text-right">
               <p className="text-slate-400 text-xs">Active Jobs Value</p>
@@ -301,12 +533,12 @@ const CRMJobs: React.FC = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <h3 className="font-semibold text-white">{job.title}</h3>
-                    <Badge className={getTypeColor(job.type)} variant="outline">{job.type}</Badge>
-                    <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                    <h3 className="font-semibold text-white">{job.jobTitle}</h3>
+                    <Badge className={getTypeColor(job.jobType)} variant="outline">{job.jobType}</Badge>
+                    <Badge className={getStatusColor(job.status || 'pending')}>{job.status || 'pending'}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-4 text-sm text-slate-400">
-                    <div className="flex items-center gap-1"><Briefcase className="h-3 w-3" /><span>{job.client}</span></div>
+                    <div className="flex items-center gap-1"><Briefcase className="h-3 w-3" /><span>{job.clientName}</span></div>
                     <div className="flex items-center gap-1"><User className="h-3 w-3" /><span>{job.assignedOfficer}</span></div>
                     <div className="flex items-center gap-1"><MapPin className="h-3 w-3" /><span>{job.location}</span></div>
                     <div className="flex items-center gap-1"><Calendar className="h-3 w-3" /><span>{job.startDate} - {job.endDate}</span></div>
@@ -317,8 +549,12 @@ const CRMJobs: React.FC = () => {
                     <p className="text-xs text-slate-400">Contract Value</p>
                     <p className="text-lg font-bold text-white">R{job.value.toLocaleString()}</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => { setSelectedJob(job); setView('detail'); }}
-                    className="border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => { setSelectedJob(job); setView('detail'); }}
+                    className="border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700"
+                  >
                     View Details
                   </Button>
                 </div>

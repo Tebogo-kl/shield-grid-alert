@@ -35,6 +35,8 @@ interface Client {
   contractValue: number;
   servicesCount: number;
 }
+const API_BASE_URL = 'https://localhost:44339/api';
+
 
 const mockClients: Client[] = [
   {
